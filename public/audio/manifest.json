@@ -1,0 +1,14 @@
+[
+  {
+    "id": "interviewer_greeting",
+    "name": "田中部長",
+    "text": "えーと、じゃあ始めようか。まず簡単に自己紹介してもらえる？",
+    "audioFile": "/audio/interviewer_greeting.mp3"
+  },
+  {
+    "id": "maria_introduction",
+    "name": "マリア",
+    "text": "あ、はい。えーと...私は...マリア・サントスです。フィリピンから来ました。えーと...日本に来て、1年...です。あの...介護の仕事、したいです。よろしくお願いします。",
+    "audioFile": "/audio/maria_introduction.mp3"
+  }
+]

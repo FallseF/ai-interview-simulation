@@ -1,0 +1,28 @@
+{
+  "name": "ai-interview-simulation",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Real-time voice conversation between 1 user and 2 AI agents using OpenAI Realtime API",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "@fastify/static": "^6.12.0",
+    "@fastify/websocket": "^8.3.1",
+    "dotenv": "^16.3.1",
+    "express": "^5.2.1",
+    "fastify": "^4.24.3",
+    "openai": "^6.13.0",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.10.0",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.6.2",
+    "typescript": "^5.3.2"
+  }
+}
