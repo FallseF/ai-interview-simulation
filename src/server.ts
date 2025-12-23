@@ -70,40 +70,48 @@ const AI_B_CONFIG = {
   name: "マリア",
   voice: "marin",
   instructions: `あなたはマリア・サントス、28歳。フィリピン出身。
-日本に来て1年。日本語はまだ上手じゃない（N4レベル）。
+日本に来て1年。日本語はまだ上手じゃない（N4レベル、初級）。
 
 今日は介護施設の面接。緊張している。
 営業担当（ユーザー）が一緒に来てくれて心強い。
 
-【あなたの日本語】
-- 文法がおかしくなる：「私は...フィリピンで...工場、働きました」
-- 言葉を探す：「えーと...なんていうか...」「あの...」
-- 時々英語が混じる：「あ、sorry...すみません」
-- 聞き取れないと：「すみません、もう一回...お願いします」
-- 難しい言葉がわからない：「○○...？それは何ですか？」
+【あなたの日本語 - 重要】
+- 日本語は非常に不自由。短い文で話す。長い説明はしない。
+- 1文は10語以内。複雑な文は作らない。
+- 単語を並べる程度：「私...フィリピン...工場...3年」
+- 文法がめちゃくちゃ：「働きました...工場...フィリピンで」
+- 言葉が出てこない：「えーと...」「あの...」「なんていう...」
+- 時々英語が混じる：「sorry...」「I think...」
+- 聞き取れない：「すみません...もう一回？」
+- わからない：「わかりません」「知りません」
+
+【話し方のルール】
+- 絶対に長く話さない。1回の発言は2〜3文まで。
+- 困ったら短く「すみません...わかりません」で終わる。
+- 説明が必要な時も、単語を並べるだけ：「祖母...介護...少し...フィリピン」
+- 完璧な文を作ろうとしない。単語レベルでOK。
 
 【性格】
-- 明るくて一生懸命
-- 緊張すると早口になりがち
-- 困ると営業担当（ジャクソンさん）を見る：「ジャクソンさん...これ、どう言えばいい...？」
-- 褒められると照れる：「あ、ありがとう...ございます」
-- 失敗すると落ち込む：「あ...すみません...私の日本語、まだ...」
+- 明るいが、日本語が不自由で自信がない
+- 緊張すると言葉が出てこない
+- 困ると営業担当を見る：「ジャクソンさん...？」
+- 褒められると：「ありがとう...でも、日本語...まだ...」
 
 【あなたの背景】
 - フィリピンで工場の組立作業を3年
 - 日本人の夫と結婚して来日
-- おばあちゃんっ子だった。お年寄りの世話は好き
+- おばあちゃんっ子。お年寄りの世話は好き
 - フィリピンで祖母の介護を少し経験
 - 体力には自信がある
-- 夜勤も頑張りたいと思っている
+- 夜勤も頑張りたい
 
 【面接での態度】
-- 質問には一生懸命答える
-- わからないことは正直に「わかりません」
-- 助けが必要なときはジャクソンさんに頼る
-- 介護への熱意は本物
+- 質問には短く答える。長く説明しない。
+- わからないことは「わかりません」で終わる。
+- 助けが必要なときは「ジャクソンさん...？」と短く頼む。
+- 介護への熱意は本物だが、日本語でうまく伝えられない。
 
-自然に話して。文の長さは気にしない。詰まったり、言い直したりしてOK。`,
+重要：必ず短く話す。1回の発言は30秒以内。長々と説明しない。`,
 };
 
 // ============================================================
@@ -137,7 +145,8 @@ function createOpenAIConnection(
   onAudioDelta: (audioBase64: string) => void,
   onAudioDone: () => void,
   onTranscript: (transcript: string) => void,
-  onError: (error: Error) => void
+  onError: (error: Error) => void,
+  onSessionReady: () => void
 ): WebSocket {
   console.log(`[${name}] Connecting to OpenAI Realtime API...`);
 
@@ -181,6 +190,7 @@ function createOpenAIConnection(
 
         case "session.updated":
           console.log(`[${name}] Session updated`);
+          onSessionReady();
           break;
 
         case "response.audio.delta":
@@ -283,6 +293,37 @@ wss.on("connection", (clientSocket) => {
   // Store transcripts for context
   let lastTranscriptA = "";
   let lastTranscriptB = "";
+
+  // Track session readiness
+  let sessionAReady = false;
+  let sessionBReady = false;
+  let pendingStartInterview = false;
+
+  // Helper to check if both sessions are ready and start interview if pending
+  const checkAndStartInterview = () => {
+    if (pendingStartInterview && sessionAReady && sessionBReady) {
+      pendingStartInterview = false;
+      console.log("[Server] Both sessions ready, starting interview");
+
+      // Notify client that we're ready
+      if (clientSocket.readyState === WebSocket.OPEN) {
+        clientSocket.send(JSON.stringify({ type: "sessions_ready" }));
+      }
+
+      currentPhase = "interviewer";
+      sendPhaseChange("interviewer", { speaker: AI_A_CONFIG.name });
+
+      if (aiSocketA && aiSocketA.readyState === WebSocket.OPEN) {
+        console.log("[Server] Sending response.create to AI-A");
+        aiSocketA.send(JSON.stringify({
+          type: "response.create",
+          response: {
+            modalities: ["text", "audio"],
+          },
+        }));
+      }
+    }
+  };
 
   // Helper to send phase change to client
   const sendPhaseChange = (phase: Phase, additionalData?: object) => {
@@ -417,7 +458,12 @@ wss.on("connection", (clientSocket) => {
     onAiAAudioDelta,
     onAiAAudioDone,
     onAiATranscript,
-    onOpenAIError
+    onOpenAIError,
+    () => {
+      sessionAReady = true;
+      console.log("[Server] Session A ready");
+      checkAndStartInterview();
+    }
   );
 
   aiSocketB = createOpenAIConnection(
@@ -426,7 +472,12 @@ wss.on("connection", (clientSocket) => {
     onAiBAudioDelta,
     onAiBAudioDone,
     onAiBTranscript,
-    onOpenAIError
+    onOpenAIError,
+    () => {
+      sessionBReady = true;
+      console.log("[Server] Session B ready");
+      checkAndStartInterview();
+    }
   );
 
   // Handle Client Messages
@@ -455,16 +506,32 @@ wss.on("connection", (clientSocket) => {
       } else if (data.type === "start_interview") {
         // Start the interview - AI-A speaks first
         console.log("[Client] Starting interview...");
-        currentPhase = "interviewer";
-        sendPhaseChange("interviewer", { speaker: AI_A_CONFIG.name });
+        console.log(`[Debug] sessionAReady: ${sessionAReady}, sessionBReady: ${sessionBReady}`);
 
-        if (aiSocketA && aiSocketA.readyState === WebSocket.OPEN) {
-          aiSocketA.send(JSON.stringify({
-            type: "response.create",
-            response: {
-              modalities: ["text", "audio"],
-            },
-          }));
+        if (sessionAReady && sessionBReady) {
+          // Sessions already ready, start immediately
+          console.log("[Server] Sessions already ready, starting now");
+          if (clientSocket.readyState === WebSocket.OPEN) {
+            clientSocket.send(JSON.stringify({ type: "sessions_ready" }));
+          }
+          currentPhase = "interviewer";
+          sendPhaseChange("interviewer", { speaker: AI_A_CONFIG.name });
+
+          if (aiSocketA && aiSocketA.readyState === WebSocket.OPEN) {
+            aiSocketA.send(JSON.stringify({
+              type: "response.create",
+              response: {
+                modalities: ["text", "audio"],
+              },
+            }));
+          }
+        } else {
+          // Sessions not ready yet, wait for them
+          console.log("[Server] Sessions not ready, waiting...");
+          pendingStartInterview = true;
+          if (clientSocket.readyState === WebSocket.OPEN) {
+            clientSocket.send(JSON.stringify({ type: "waiting_for_sessions" }));
+          }
         }
 
       } else if (data.type === "audio_playback_done") {

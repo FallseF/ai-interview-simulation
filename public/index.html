@@ -45,48 +45,6 @@
       color: #1a1a1a;
     }
 
-    .status-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 500;
-      background: #fef2f2;
-      color: #dc2626;
-    }
-
-    .status-badge.connected {
-      background: #f0fdf4;
-      color: #16a34a;
-    }
-
-    .status-badge.connecting {
-      background: #fefce8;
-      color: #ca8a04;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #dc2626;
-    }
-
-    .status-badge.connected .status-dot {
-      background: #16a34a;
-    }
-
-    .status-badge.connecting .status-dot {
-      background: #ca8a04;
-      animation: blink 1s infinite;
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
 
     /* Main Layout */
     .main-container {
@@ -581,6 +539,37 @@
       cursor: not-allowed;
     }
 
+    /* Loading State */
+    .loading-state {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 24px;
+      background: #f0f9ff;
+      border: 1px solid #0ea5e9;
+      border-radius: 8px;
+      color: #0369a1;
+    }
+
+    .loading-spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #bae6fd;
+      border-top: 2px solid #0ea5e9;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
     /* Instructions Card */
     .instructions-card {
       background: #fff;
@@ -819,10 +808,6 @@
   <header class="header">
     <div class="header-content">
       <h1 class="header-title">面接シミュレーション</h1>
-      <div class="status-badge" id="statusBadge">
-        <div class="status-dot"></div>
-        <span id="statusText">未接続</span>
-      </div>
     </div>
   </header>
 
@@ -948,6 +933,11 @@
           <svg class="icon icon-sm"><use href="#icon-play"></use></svg>
           面接を開始
         </button>
+        <!-- Loading State -->
+        <div class="loading-state" id="loadingState" style="display: none;">
+          <div class="loading-spinner"></div>
+          <span class="loading-text" id="loadingText">AIに接続中...</span>
+        </div>
       </div>
     </div>
   </div>
@@ -975,8 +965,6 @@
     // ============================================================
     // UI Elements
     // ============================================================
-    var statusBadge = document.getElementById('statusBadge');
-    var statusText = document.getElementById('statusText');
     var startBtn = document.getElementById('startBtn');
     var chatMessages = document.getElementById('chatMessages');
     var emptyState = document.getElementById('emptyState');
@@ -1180,17 +1168,10 @@
       var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       var wsUrl = protocol + '//' + window.location.host + '/ws';
 
-      statusBadge.classList.remove('connected');
-      statusBadge.classList.add('connecting');
-      statusText.textContent = '接続中...';
-
       websocket = new WebSocket(wsUrl);
 
       websocket.onopen = function() {
         isConnected = true;
-        statusBadge.classList.remove('connecting');
-        statusBadge.classList.add('connected');
-        statusText.textContent = '接続中';
         if (callback) callback();
       };
 
@@ -1223,8 +1204,6 @@
 
     function handleDisconnect() {
       isConnected = false;
-      statusBadge.classList.remove('connected', 'connecting');
-      statusText.textContent = '未接続';
       startBtn.disabled = false;
       updatePhase('waiting');
       stopUserMicrophone();
@@ -1261,6 +1240,18 @@
 
         case 'error':
           addMessage('エラー: ' + data.message, 'system');
+          break;
+
+        case 'waiting_for_sessions':
+          // Server is waiting for OpenAI sessions to be ready
+          console.log('[Server] Waiting for sessions...');
+          showLoadingState('AIに接続中...');
+          break;
+
+        case 'sessions_ready':
+          // OpenAI sessions are ready, interview will start
+          console.log('[Server] Sessions ready, starting interview');
+          hideLoadingState();
           break;
 
         default:
@@ -1471,10 +1462,28 @@
     }
 
     // ============================================================
+    // Loading State
+    // ============================================================
+    var loadingState = document.getElementById('loadingState');
+    var loadingText = document.getElementById('loadingText');
+
+    function showLoadingState(message) {
+      startBtn.style.display = 'none';
+      loadingState.style.display = 'flex';
+      loadingText.textContent = message || 'AIに接続中...';
+    }
+
+    function hideLoadingState() {
+      loadingState.style.display = 'none';
+      // Don't show start button again - interview is starting
+    }
+
+    // ============================================================
     // User Actions
     // ============================================================
     function startInterviewFlow() {
       startBtn.disabled = true;
+      showLoadingState('サーバーに接続中...');
 
       if (!isConnected) {
         // Connect first, then start interview
