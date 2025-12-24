@@ -221,6 +221,10 @@ function createOpenAIConnection(
           console.error(`[${name}] Error from OpenAI:`, JSON.stringify(event, null, 2));
           break;
 
+        case "response.done":
+          console.log(`[${name}] response.done:`, JSON.stringify(event, null, 2));
+          break;
+
         default:
           if (!event.type.includes("delta") && !event.type.includes("rate_limits")) {
             console.log(`[${name}] Event: ${event.type}`);
