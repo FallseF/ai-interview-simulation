@@ -11,6 +11,9 @@
     "start": "cd server && npm start",
     "dev": "cd server && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
+    "test": "npm run test:server && npm run test:frontend",
+    "test:server": "cd server && npm test",
+    "test:frontend": "cd frontend && npm test",
     "install:all": "npm install && cd server && npm install && cd ../frontend && npm install",
     "postinstall": "cd server && npm install && cd ../frontend && npm install"
   },
