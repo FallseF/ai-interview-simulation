@@ -1,26 +1,29 @@
 {
   "name": "ai-interview-simulation",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "Real-time voice conversation between 1 user and 2 AI agents using OpenAI Realtime API",
-  "main": "dist/server.js",
+  "description": "AI Interview Simulation - 2AI + 1 Human (Career Support) Demo",
+  "private": true,
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "tsx watch src/server.ts",
-    "postinstall": "npm run build"
+    "build": "npm run build:server && npm run build:frontend",
+    "build:server": "cd server && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "cd server && npm start",
+    "dev": "cd server && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "test": "npm run test:server && npm run test:frontend",
+    "test:server": "cd server && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "install:all": "npm install && cd server && npm install && cd ../frontend && npm install",
+    "postinstall": "cd server && npm install && cd ../frontend && npm install"
   },
   "dependencies": {
-    "@fastify/static": "^6.12.0",
-    "@fastify/websocket": "^8.3.1",
     "dotenv": "^16.3.1",
-    "express": "^5.2.1",
-    "fastify": "^4.24.3",
-    "openai": "^6.13.0",
+    "express": "^5.0.0",
     "ws": "^8.14.2"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
+    "@types/express": "^5.0.0",
     "@types/node": "^20.10.0",
     "@types/ws": "^8.5.10",
     "tsx": "^4.6.2",
