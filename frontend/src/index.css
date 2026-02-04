@@ -324,6 +324,12 @@ body::before {
   overflow: hidden;
 }
 
+.chat-panel {
+  height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
 .panel-header {
   display: flex;
   align-items: center;

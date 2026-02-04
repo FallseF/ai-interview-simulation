@@ -5,9 +5,6 @@ interface SessionControlsProps {
   isConnected: boolean;
   isLoading: boolean;
   onStart: (mode: InterviewMode) => void;
-  onModeChange: (mode: InterviewMode) => void;
-  onNextTurn: () => void;
-  onProceedToNext: () => void;
   onRestart: () => void;
 }
 
@@ -16,12 +13,9 @@ export function SessionControls({
   isConnected,
   isLoading,
   onStart,
-  onModeChange,
-  onNextTurn,
-  onProceedToNext,
   onRestart,
 }: SessionControlsProps) {
-  const { phase, mode, waitingForNext } = state;
+  const { phase } = state;
 
   // Waiting state - show start button
   if (phase === "waiting") {
@@ -34,23 +28,9 @@ export function SessionControls({
           </div>
         ) : (
           <>
-            <div className="mode-toggle">
-              <button
-                className={`mode-btn ${mode === "step" ? "active" : ""}`}
-                onClick={() => onModeChange("step")}
-              >
-                ステップ
-              </button>
-              <button
-                className={`mode-btn ${mode === "auto" ? "active" : ""}`}
-                onClick={() => onModeChange("auto")}
-              >
-                オート
-              </button>
-            </div>
             <button
               className="control-btn start"
-              onClick={() => onStart(mode)}
+              onClick={() => onStart("auto")}
               disabled={!isConnected || isLoading}
             >
               面接を開始
@@ -83,39 +63,5 @@ export function SessionControls({
     );
   }
 
-  // User choice state - show action buttons
-  if (phase === "user_choice" || waitingForNext) {
-    return (
-      <div className="action-buttons visible">
-        {mode === "step" && (
-          <button className="control-btn next" onClick={onNextTurn}>
-            次へ進む (Step)
-          </button>
-        )}
-        <button className="action-btn secondary" onClick={onProceedToNext}>
-          次の質問へ
-        </button>
-      </div>
-    );
-  }
-
-  // Speaking states - show mode toggle only
-  return (
-    <div className="control-bar">
-      <div className="mode-toggle">
-        <button
-          className={`mode-btn ${mode === "step" ? "active" : ""}`}
-          onClick={() => onModeChange("step")}
-        >
-          ステップ
-        </button>
-        <button
-          className={`mode-btn ${mode === "auto" ? "active" : ""}`}
-          onClick={() => onModeChange("auto")}
-        >
-          オート
-        </button>
-      </div>
-    </div>
-  );
+  return null;
 }

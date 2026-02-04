@@ -28,12 +28,9 @@ function App() {
     connect,
     disconnect,
     startSession,
-    setMode,
-    nextTurn,
     sendText,
     sendAudioChunk,
     commitAudio,
-    proceedToNext,
     userWillSpeak,
     audioQueue,
     shiftAudioQueue,
@@ -45,7 +42,7 @@ function App() {
 
   const { playAudio } = useAudioPlayer();
   const fixedTarget: Target = "interviewer";
-  const [localMode, setLocalMode] = useState<InterviewMode>("step");
+  const fixedMode: InterviewMode = "auto";
   const [personaConfig, setPersonaConfig] = useState<PersonaConfig | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -58,7 +55,7 @@ function App() {
       : "進行中"
     : "未接続";
   const statusTone = isConnected ? "ok" : "off";
-  const modeLabel = localMode === "auto" ? "オート" : "ステップ";
+  const modeLabel = "オート";
 
   // Track if we're currently playing audio
   const isPlayingRef = useRef(false);
@@ -102,28 +99,17 @@ function App() {
   // Handle start session (from PatternSelector)
   const handlePatternStart = useCallback(
     (pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => {
-      startSession(localMode, pattern, japaneseLevel, personaConfig || undefined);
+      startSession(fixedMode, pattern, japaneseLevel, personaConfig || undefined);
     },
-    [startSession, localMode, personaConfig]
+    [startSession, fixedMode, personaConfig]
   );
 
   // Handle start session (legacy, for SessionControls - uses default pattern)
   const handleStart = useCallback(
-    (mode: InterviewMode) => {
-      startSession(mode, "pattern2", "N4", personaConfig || undefined);
+    () => {
+      startSession(fixedMode, "pattern2", "N4", personaConfig || undefined);
     },
-    [startSession, personaConfig]
-  );
-
-  // Handle mode change
-  const handleModeChange = useCallback(
-    (mode: InterviewMode) => {
-      setLocalMode(mode);
-      if (state.phase !== "waiting") {
-        setMode(mode);
-      }
-    },
-    [setMode, state.phase]
+    [startSession, fixedMode, personaConfig]
   );
 
   // Handle restart
@@ -214,7 +200,6 @@ function App() {
             transcripts={transcripts}
             isConnected={isConnected}
             isLoading={isLoading}
-            localMode={localMode}
             fixedTarget={fixedTarget}
             canInput={canInput}
             onSendText={handleSendText}
@@ -222,9 +207,6 @@ function App() {
             onCommitAudio={handleCommitAudio}
             onStartSpeaking={handleStartSpeaking}
             onStart={handleStart}
-            onModeChange={handleModeChange}
-            onNextTurn={nextTurn}
-            onProceedToNext={proceedToNext}
             onRestart={handleRestart}
           />
         )}

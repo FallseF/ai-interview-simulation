@@ -5,7 +5,6 @@ import { VoiceInput } from "../VoiceInput";
 import { SessionControls } from "../SessionControls";
 import type {
   Target,
-  InterviewMode,
   InterviewState,
   TranscriptEntry,
 } from "../../types/ws";
@@ -15,17 +14,13 @@ interface InterviewPhaseProps {
   transcripts: TranscriptEntry[];
   isConnected: boolean;
   isLoading: boolean;
-  localMode: InterviewMode;
   fixedTarget: Target;
   canInput: boolean;
   onSendText: (target: Target, text: string) => void;
   onAudioChunk: (target: Target, audioBase64: string) => void;
   onCommitAudio: (target: Target) => void;
   onStartSpeaking: () => void;
-  onStart: (mode: InterviewMode) => void;
-  onModeChange: (mode: InterviewMode) => void;
-  onNextTurn: () => void;
-  onProceedToNext: () => void;
+  onStart: () => void;
   onRestart: () => void;
 }
 
@@ -34,7 +29,6 @@ export function InterviewPhase({
   transcripts,
   isConnected,
   isLoading,
-  localMode,
   fixedTarget,
   canInput,
   onSendText,
@@ -42,9 +36,6 @@ export function InterviewPhase({
   onCommitAudio,
   onStartSpeaking,
   onStart,
-  onModeChange,
-  onNextTurn,
-  onProceedToNext,
   onRestart,
 }: InterviewPhaseProps) {
   return (
@@ -92,13 +83,10 @@ export function InterviewPhase({
             )}
 
             <SessionControls
-              state={{ ...state, mode: localMode }}
+              state={state}
               isConnected={isConnected}
               isLoading={isLoading}
               onStart={onStart}
-              onModeChange={onModeChange}
-              onNextTurn={onNextTurn}
-              onProceedToNext={onProceedToNext}
               onRestart={onRestart}
             />
           </div>
