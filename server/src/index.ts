@@ -188,6 +188,7 @@ wss.on("connection", (clientSocket) => {
         const pattern: InterviewPattern = data.pattern || "pattern2";
         const japaneseLevel: JapaneseLevel = data.japaneseLevel || "N4";
         const mode = data.mode || "step";
+        const persona = data.persona; // ペルソナ設定（オプション）
 
         const patternConfig: PatternConfig = {
           pattern,
@@ -200,11 +201,14 @@ wss.on("connection", (clientSocket) => {
         console.log(`[Server] Japanese Level: ${japaneseLevel}`);
         console.log(`[Server] Mode: ${mode}`);
         console.log(`[Server] Participants: ${patternConfig.participants.join(", ")}`);
+        if (persona) {
+          console.log(`[Server] Persona: ${JSON.stringify(persona, null, 2)}`);
+        }
         console.log(`[Server] ===========================`);
 
-        // Create orchestrator with the actual pattern config
+        // Create orchestrator with the actual pattern config and persona
         // Orchestrator will automatically start interview when AI connections are ready
-        orchestrator = new InterviewOrchestrator(clientSocket, patternConfig, mode);
+        orchestrator = new InterviewOrchestrator(clientSocket, patternConfig, mode, persona);
 
         // Remove this handler since orchestrator now handles messages
         clientSocket.off("message", messageHandler);

@@ -1,10 +1,10 @@
-import type { Target, Speaker, InterviewMode, InterviewPattern, JapaneseLevel, Role } from "./roles.js";
+import type { Target, Speaker, InterviewMode, InterviewPattern, JapaneseLevel, Role, PersonaConfig } from "./roles.js";
 
 // ============================================================
 // Client → Server Messages
 // ============================================================
 export type ClientMessage =
-  | { type: "start_session"; mode: InterviewMode; pattern: InterviewPattern; japaneseLevel?: JapaneseLevel }
+  | { type: "start_session"; mode: InterviewMode; pattern: InterviewPattern; japaneseLevel?: JapaneseLevel; persona?: PersonaConfig }
   | { type: "set_mode"; mode: InterviewMode }
   | { type: "next_turn" }  // step mode: trigger next AI speaker
 

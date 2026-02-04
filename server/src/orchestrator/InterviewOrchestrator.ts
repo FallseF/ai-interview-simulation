@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import type { Speaker, Target, InterviewMode, EndReason, PatternConfig, AIPersonaConfig } from "../types/roles.js";
+import type { Speaker, Target, InterviewMode, EndReason, PatternConfig, AIPersonaConfig, PersonaConfig } from "../types/roles.js";
 import type { ClientMessage, ServerMessage, EvaluationResultMessage } from "../types/ws.js";
 import { INTERVIEW_CONFIG, MOCK_MODE } from "../config.js";
 import { OpenAIRealtimeConnection, type OpenAIConnectionCallbacks } from "../realtime/openaiWs.js";
@@ -12,6 +12,10 @@ import { FeedbackFormatter } from "../evaluation/FeedbackFormatter.js";
 import { createPattern1StudentConfig } from "../prompts/patterns/pattern1.js";
 import { createPattern2InterviewerConfig, createPattern2StudentConfig } from "../prompts/patterns/pattern2.js";
 import { createPattern3InterviewerConfig } from "../prompts/patterns/pattern3.js";
+// Persona-aware configurations
+import { createInterviewerConfig } from "../prompts/interviewer.js";
+import { createCandidateConfig } from "../prompts/candidate.js";
+import { DEFAULT_INTERVIEWER_PERSONA, DEFAULT_CANDIDATE_PERSONA } from "../prompts/persona/index.js";
 
 // 接続のインターフェース型（本物とモックで共通）
 type AIConnection = OpenAIRealtimeConnection | MockOpenAIRealtimeConnection;
@@ -37,6 +41,9 @@ export class InterviewOrchestrator {
   // パターン設定
   private patternConfig: PatternConfig;
 
+  // ペルソナ設定
+  private personaConfig?: PersonaConfig;
+
   // モックモード時のカスタムシナリオ（オプション）
   private mockScenario?: MockScenario;
 
@@ -44,10 +51,12 @@ export class InterviewOrchestrator {
     clientSocket: WebSocket,
     patternConfig: PatternConfig,
     mode: InterviewMode = "step",
+    personaConfig?: PersonaConfig,
     mockScenario?: MockScenario
   ) {
     this.clientSocket = clientSocket;
     this.patternConfig = patternConfig;
+    this.personaConfig = personaConfig;
     this.turnManager = new TurnManager(mode);
     this.transcriptStore = new TranscriptStore();
     this.mockScenario = mockScenario;
@@ -81,12 +90,57 @@ export class InterviewOrchestrator {
   }
 
   /**
-   * Get AI configurations based on the current pattern
+   * Get AI configurations based on the current pattern and persona settings
    */
   private getPatternConfigs(): { interviewerConfig: AIPersonaConfig | null; candidateConfig: AIPersonaConfig | null } {
     const { pattern, japaneseLevel } = this.patternConfig;
-    console.log(`[Orchestrator] Getting configs for pattern: ${pattern}, japaneseLevel: ${japaneseLevel}`);
+    const persona = this.personaConfig;
+    console.log(`[Orchestrator] Getting configs for pattern: ${pattern}, japaneseLevel: ${japaneseLevel}, persona: ${persona ? "custom" : "default"}`);
 
+    // ペルソナが設定されている場合はペルソナベースの設定を使用
+    if (persona) {
+      const interviewerPersona = persona.interviewer || DEFAULT_INTERVIEWER_PERSONA;
+      const candidatePersona = persona.candidate || {
+        ...DEFAULT_CANDIDATE_PERSONA,
+        japaneseLevel: japaneseLevel || "N4",
+      };
+
+      // 候補者の日本語レベルをペルソナ設定から上書き
+      if (japaneseLevel && candidatePersona.japaneseLevel !== japaneseLevel) {
+        candidatePersona.japaneseLevel = japaneseLevel;
+      }
+
+      console.log(`[Orchestrator] Using persona - Interviewer: ${interviewerPersona.personality}, ${interviewerPersona.dialect}`);
+      console.log(`[Orchestrator] Using persona - Candidate: ${candidatePersona.japaneseLevel}`);
+
+      switch (pattern) {
+        case "pattern1":
+          // 営業(human) vs 学生(AI) - 候補者のみペルソナ使用
+          return {
+            interviewerConfig: null,
+            candidateConfig: createCandidateConfig(undefined, candidatePersona),
+          };
+        case "pattern2":
+          // 営業(human) vs 学生(AI) vs 面接官(AI) - 両方ペルソナ使用
+          return {
+            interviewerConfig: createInterviewerConfig(undefined, interviewerPersona),
+            candidateConfig: createCandidateConfig(undefined, candidatePersona),
+          };
+        case "pattern3":
+          // 営業(human) vs 面接官(AI) - 面接官のみペルソナ使用
+          return {
+            interviewerConfig: createInterviewerConfig(undefined, interviewerPersona),
+            candidateConfig: null,
+          };
+        default:
+          return {
+            interviewerConfig: createInterviewerConfig(undefined, interviewerPersona),
+            candidateConfig: createCandidateConfig(undefined, candidatePersona),
+          };
+      }
+    }
+
+    // ペルソナなしの場合は従来のパターンベース設定を使用
     switch (pattern) {
       case "pattern1":
         // 営業(human) vs 学生(AI) - 出席確認・自己紹介練習

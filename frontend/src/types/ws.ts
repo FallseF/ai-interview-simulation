@@ -16,9 +16,67 @@ export type Target = "interviewer" | "candidate" | "both";
 // Interview mode
 export type InterviewMode = "step" | "auto";
 
+// === ペルソナ設定 ===
+
+// 性別
+export type Gender = "male" | "female";
+
+// 業種
+export type Industry =
+  | "manufacturing"   // 製造業
+  | "nursing"         // 介護
+  | "restaurant"      // 飲食
+  | "retail"          // 小売
+  | "logistics"       // 物流
+  | "construction"    // 建設
+  | "it"              // IT
+  | "other";          // その他
+
+// 面接官の性格
+export type InterviewerPersonality =
+  | "detailed"        // 細かい
+  | "casual"          // ガサツ
+  | "inquisitive"     // 質問が多い
+  | "friendly"        // フレンドリー
+  | "strict";         // 厳格
+
+// 外国人雇用に関する理解度
+export type ForeignHiringLiteracy = "high" | "low";
+
+// 方言
+export type Dialect = "standard" | "kansai" | "kyushu" | "tohoku";
+
+// 難易度モード
+export type DifficultyMode = "beginner" | "hard";
+
+// 面接官ペルソナ設定
+export interface InterviewerPersona {
+  gender: Gender;
+  industry: Industry;
+  personality: InterviewerPersonality;
+  foreignHiringLiteracy: ForeignHiringLiteracy;
+  dialect: Dialect;
+  difficulty: DifficultyMode;
+  customName?: string;
+}
+
+// 外国人候補者ペルソナ設定
+export interface CandidatePersona {
+  japaneseLevel: JapaneseLevel;
+  nationality?: string;
+  workExperience?: boolean;
+  customName?: string;
+}
+
+// 統合ペルソナ設定
+export interface PersonaConfig {
+  interviewer?: InterviewerPersona;
+  candidate?: CandidatePersona;
+}
+
 // Client → Server Messages
 export type ClientMessage =
-  | { type: "start_session"; mode: InterviewMode; pattern: InterviewPattern; japaneseLevel?: JapaneseLevel }
+  | { type: "start_session"; mode: InterviewMode; pattern: InterviewPattern; japaneseLevel?: JapaneseLevel; persona?: PersonaConfig }
   | { type: "set_mode"; mode: InterviewMode }
   | { type: "next_turn" }
 
