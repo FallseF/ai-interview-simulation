@@ -8,6 +8,7 @@ import { TurnManager } from "./TurnManager.js";
 import { TranscriptStore } from "./TranscriptStore.js";
 import { Evaluator } from "../evaluation/Evaluator.js";
 import { FeedbackFormatter } from "../evaluation/FeedbackFormatter.js";
+import { SessionStore } from "../db/index.js";
 // Pattern-specific configurations
 import { createPattern1StudentConfig } from "../prompts/patterns/pattern1.js";
 import { createPattern2InterviewerConfig, createPattern2StudentConfig } from "../prompts/patterns/pattern2.js";
@@ -27,6 +28,7 @@ export class InterviewOrchestrator {
 
   private turnManager: TurnManager;
   private transcriptStore: TranscriptStore;
+  private sessionStore: SessionStore;
 
   private interviewerReady = false;
   private candidateReady = false;
@@ -59,6 +61,7 @@ export class InterviewOrchestrator {
     this.personaConfig = personaConfig;
     this.turnManager = new TurnManager(mode);
     this.transcriptStore = new TranscriptStore();
+    this.sessionStore = new SessionStore();
     this.mockScenario = mockScenario;
 
     this.setupClientHandlers();
@@ -348,6 +351,12 @@ export class InterviewOrchestrator {
 
       if (!this.interviewStartTime) {
         this.interviewStartTime = new Date();
+        // DBにセッション開始を記録
+        this.sessionStore.startSession(
+          this.patternConfig.pattern,
+          this.turnManager.getMode(),
+          this.patternConfig.japaneseLevel
+        );
       }
 
       const initialSpeaker = this.patternConfig.pattern === "pattern1" ? "candidate" : "interviewer";
@@ -506,6 +515,8 @@ export class InterviewOrchestrator {
 
   private handleTranscriptDone(speaker: Speaker, fullText: string): void {
     this.transcriptStore.commit(speaker, fullText);
+    // DBにトランスクリプトを保存
+    this.sessionStore.addTranscript(speaker, fullText);
 
     this.sendToClient({
       type: "transcript_done",
@@ -522,6 +533,8 @@ export class InterviewOrchestrator {
 
   private handleHumanTranscript(text: string): void {
     this.transcriptStore.commit("human", text);
+    // DBにトランスクリプトを保存
+    this.sessionStore.addTranscript("human", text);
 
     this.sendToClient({
       type: "transcript_done",
@@ -695,6 +708,9 @@ export class InterviewOrchestrator {
     this.turnManager.end();
     this.sendTurnState();
 
+    // DBにセッション終了を記録
+    this.sessionStore.endSession(reason);
+
     // 評価を実行してフィードバックを送信
     this.performEvaluation();
   }
@@ -719,6 +735,9 @@ export class InterviewOrchestrator {
         type: "evaluation_result",
         result: resultJson,
       });
+
+      // DBに評価結果を保存
+      this.sessionStore.saveEvaluation(resultJson);
 
       console.log("[Orchestrator] Evaluation completed and sent to client");
     } catch (error) {

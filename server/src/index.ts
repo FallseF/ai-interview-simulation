@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { validateEnv, PORT, MOCK_MODE } from "./config.js";
 import { InterviewOrchestrator } from "./orchestrator/InterviewOrchestrator.js";
 import type { PatternConfig, InterviewPattern, JapaneseLevel, Role } from "./types/roles.js";
+import { initializeSchema, getRecentSessions, getStatistics, isDbEnabled } from "./db/index.js";
 import { listScenarios, getScenario, type ScenarioName } from "./testScenarios/index.js";
 import { isAudioDebugEnabled, AudioDebugger } from "./audioTest/AudioDebugger.js";
 import {
@@ -17,6 +18,11 @@ import {
 
 // Validate environment
 validateEnv();
+
+// Initialize database schema (async, non-blocking)
+initializeSchema().catch((err) => {
+  console.error("[Server] Database schema initialization failed:", err);
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,6 +45,33 @@ app.use(express.static(fallbackPath));
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({ ok: true });
+});
+
+// ========================================
+// データベース統計エンドポイント
+// ========================================
+
+// DB接続状態
+app.get("/api/db/status", (req, res) => {
+  res.json({
+    enabled: isDbEnabled(),
+    info: isDbEnabled()
+      ? "📊 Database logging enabled"
+      : "Database logging disabled - set TURSO_DATABASE_URL to enable",
+  });
+});
+
+// 最近のセッション一覧
+app.get("/api/sessions/recent", async (req, res) => {
+  const limit = parseInt((req.query.limit as string) || "10", 10);
+  const sessions = await getRecentSessions(limit);
+  res.json({ sessions });
+});
+
+// 統計情報
+app.get("/api/stats", async (req, res) => {
+  const stats = await getStatistics();
+  res.json(stats);
 });
 
 // ========================================
