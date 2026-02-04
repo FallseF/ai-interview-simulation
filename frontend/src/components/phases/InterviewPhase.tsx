@@ -3,10 +3,12 @@ import { CoachPanel } from "../CoachPanel";
 import { TextInput } from "../TextInput";
 import { VoiceInput } from "../VoiceInput";
 import { SessionControls } from "../SessionControls";
+import { AutoProceedBar } from "../AutoProceedBar";
 import type {
   Target,
   InterviewState,
   TranscriptEntry,
+  AutoProceedStatus,
 } from "../../types/ws";
 
 interface InterviewPhaseProps {
@@ -22,6 +24,9 @@ interface InterviewPhaseProps {
   onStartSpeaking: () => void;
   onStart: () => void;
   onRestart: () => void;
+  autoProceed: AutoProceedStatus | null;
+  onPauseAutoProceed: () => void;
+  onResumeAutoProceed: () => void;
 }
 
 export function InterviewPhase({
@@ -37,6 +42,9 @@ export function InterviewPhase({
   onStartSpeaking,
   onStart,
   onRestart,
+  autoProceed,
+  onPauseAutoProceed,
+  onResumeAutoProceed,
 }: InterviewPhaseProps) {
   return (
     <div className="phase-content interview-phase">
@@ -61,6 +69,14 @@ export function InterviewPhase({
 
           <div className="panel-body">
             <CoachPanel state={state} />
+
+            {autoProceed && (
+              <AutoProceedBar
+                status={autoProceed}
+                onPause={onPauseAutoProceed}
+                onResume={onResumeAutoProceed}
+              />
+            )}
 
             {canInput && state.phase !== "ended" && (
               <>

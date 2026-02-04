@@ -50,6 +50,9 @@ export class InterviewOrchestrator {
   private mockScenario?: MockScenario;
   private autoProceedTimer: NodeJS.Timeout | null = null;
   private readonly autoProceedDelayMs = 4000;
+  private autoProceedState: "idle" | "scheduled" | "paused" = "idle";
+  private autoProceedStartedAt: number | null = null;
+  private autoProceedRemainingMs = 0;
 
   constructor(
     clientSocket: WebSocket,
@@ -325,6 +328,14 @@ export class InterviewOrchestrator {
 
       case "proceed_to_next":
         this.handleProceedToNext();
+        break;
+
+      case "auto_proceed_pause":
+        this.pauseAutoProceed();
+        break;
+
+      case "auto_proceed_resume":
+        this.resumeAutoProceed();
         break;
 
       case "user_will_speak":
@@ -798,6 +809,15 @@ export class InterviewOrchestrator {
     }
   }
 
+  private sendAutoProceedStatus(state: "scheduled" | "paused" | "cleared", remainingMs: number): void {
+    this.sendToClient({
+      type: "auto_proceed_status",
+      state,
+      totalMs: this.autoProceedDelayMs,
+      remainingMs,
+    });
+  }
+
   private cleanup(): void {
     this.clearAutoProceedTimer();
     this.interviewerConnection?.close();
@@ -808,19 +828,76 @@ export class InterviewOrchestrator {
 
   private scheduleAutoProceedAfterCandidate(): void {
     this.clearAutoProceedTimer();
+    this.autoProceedState = "scheduled";
+    this.autoProceedRemainingMs = this.autoProceedDelayMs;
+    this.autoProceedStartedAt = Date.now();
+    this.sendAutoProceedStatus("scheduled", this.autoProceedRemainingMs);
     this.autoProceedTimer = setTimeout(() => {
       this.autoProceedTimer = null;
-      if (this.interviewEnded) return;
+      if (this.interviewEnded) {
+        this.clearAutoProceedTimer();
+        return;
+      }
       const state = this.turnManager.getState();
-      if (state.phase !== "user_choice") return;
+      if (state.phase !== "user_choice") {
+        this.clearAutoProceedTimer();
+        return;
+      }
+      this.clearAutoProceedTimer();
       this.handleProceedToNext();
-    }, this.autoProceedDelayMs);
+    }, this.autoProceedRemainingMs);
   }
 
   private clearAutoProceedTimer(): void {
+    if (this.autoProceedState === "idle" && !this.autoProceedTimer) return;
+
     if (this.autoProceedTimer) {
       clearTimeout(this.autoProceedTimer);
       this.autoProceedTimer = null;
     }
+
+    this.autoProceedState = "idle";
+    this.autoProceedStartedAt = null;
+    this.autoProceedRemainingMs = 0;
+    this.sendAutoProceedStatus("cleared", 0);
+  }
+
+  private pauseAutoProceed(): void {
+    if (this.autoProceedState !== "scheduled") return;
+
+    if (this.autoProceedTimer) {
+      clearTimeout(this.autoProceedTimer);
+      this.autoProceedTimer = null;
+    }
+
+    if (this.autoProceedStartedAt) {
+      const elapsed = Date.now() - this.autoProceedStartedAt;
+      this.autoProceedRemainingMs = Math.max(0, this.autoProceedRemainingMs - elapsed);
+    }
+    this.autoProceedStartedAt = null;
+    this.autoProceedState = "paused";
+    this.sendAutoProceedStatus("paused", this.autoProceedRemainingMs);
+  }
+
+  private resumeAutoProceed(): void {
+    if (this.autoProceedState !== "paused" || this.autoProceedRemainingMs <= 0) return;
+
+    this.autoProceedState = "scheduled";
+    this.autoProceedStartedAt = Date.now();
+    this.sendAutoProceedStatus("scheduled", this.autoProceedRemainingMs);
+    this.autoProceedTimer = setTimeout(() => {
+      this.autoProceedTimer = null;
+      if (this.interviewEnded) {
+        this.clearAutoProceedTimer();
+        return;
+      }
+      const state = this.turnManager.getState();
+      if (state.phase !== "user_choice") {
+        this.clearAutoProceedTimer();
+        return;
+      }
+      this.clearAutoProceedTimer();
+      this.handleProceedToNext();
+    }, this.autoProceedRemainingMs);
   }
 }

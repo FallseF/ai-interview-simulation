@@ -87,6 +87,10 @@ export type ClientMessage =
 
   | { type: "end_session" }
 
+  // Auto proceed controls
+  | { type: "auto_proceed_pause" }
+  | { type: "auto_proceed_resume" }
+
   // Legacy support
   | { type: "start_interview" }
   | { type: "audio"; data: string }
@@ -111,6 +115,9 @@ export type ServerMessage =
 
   // Evaluation result (after interview ends)
   | { type: "evaluation_result"; result: EvaluationResult }
+
+  // Auto proceed status
+  | { type: "auto_proceed_status"; state: "scheduled" | "paused" | "cleared"; totalMs: number; remainingMs: number }
 
   // Error
   | { type: "error"; message: string }
@@ -153,6 +160,12 @@ export interface EvaluationResult {
   }>;
   duration: number;
   evaluatedAt: string;
+}
+
+export interface AutoProceedStatus {
+  state: "scheduled" | "paused" | "cleared";
+  totalMs: number;
+  remainingMs: number;
 }
 
 // ============================================================

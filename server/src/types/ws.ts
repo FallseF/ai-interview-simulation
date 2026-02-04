@@ -15,6 +15,10 @@ export type ClientMessage =
 
   | { type: "end_session" }
 
+  // Auto proceed controls
+  | { type: "auto_proceed_pause" }
+  | { type: "auto_proceed_resume" }
+
   // Legacy support (backward compatibility)
   | { type: "start_interview" }
   | { type: "audio"; data: string }
@@ -41,6 +45,9 @@ export type ServerMessage =
 
   // Evaluation result (after interview ends)
   | { type: "evaluation_result"; result: EvaluationResultMessage }
+
+  // Auto proceed status
+  | { type: "auto_proceed_status"; state: "scheduled" | "paused" | "cleared"; totalMs: number; remainingMs: number }
 
   // Error handling
   | { type: "error"; message: string }

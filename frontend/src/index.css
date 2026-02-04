@@ -639,6 +639,68 @@ body::before {
   display: flex;
 }
 
+.auto-proceed {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 118, 110, 0.2);
+  background: rgba(15, 118, 110, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auto-proceed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.auto-proceed-title {
+  font-weight: 600;
+  color: var(--ink);
+  margin-right: 8px;
+}
+
+.auto-proceed-remaining {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.auto-proceed-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #0f766e;
+  color: #ffffff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auto-proceed-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(15, 118, 110, 0.2);
+}
+
+.auto-proceed.paused .auto-proceed-btn {
+  background: #475569;
+}
+
+.auto-proceed-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.2);
+  overflow: hidden;
+}
+
+.auto-proceed-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(15, 118, 110, 0.85), rgba(56, 189, 248, 0.85));
+  transition: width 0.12s linear;
+}
+
 .action-btn {
   padding: 12px 22px;
   border-radius: 14px;

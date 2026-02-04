@@ -10,6 +10,7 @@ import type {
   JapaneseLevel,
   EvaluationResult,
   PersonaConfig,
+  AutoProceedStatus,
 } from "../types/ws";
 
 interface UseWebSocketReturn {
@@ -54,6 +55,11 @@ interface UseWebSocketReturn {
   // Evaluation
   evaluationResult: EvaluationResult | null;
   clearEvaluationResult: () => void;
+
+  // Auto proceed
+  autoProceed: AutoProceedStatus | null;
+  pauseAutoProceed: () => void;
+  resumeAutoProceed: () => void;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -63,6 +69,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [audioQueue, setAudioQueue] = useState<{ speaker: string; data: string }[]>([]);
   const [audioDone, setAudioDone] = useState(false);
+  const [autoProceed, setAutoProceed] = useState<AutoProceedStatus | null>(null);
 
   const [state, setState] = useState<InterviewState>({
     phase: "waiting",
@@ -157,6 +164,18 @@ export function useWebSocket(): UseWebSocketReturn {
         setEvaluationResult(data.result);
         break;
 
+      case "auto_proceed_status":
+        if (data.state === "cleared") {
+          setAutoProceed(null);
+        } else {
+          setAutoProceed({
+            state: data.state,
+            totalMs: data.totalMs,
+            remainingMs: data.remainingMs,
+          });
+        }
+        break;
+
       case "error":
         console.error("[WebSocket] Error:", data.message);
         break;
@@ -189,6 +208,7 @@ export function useWebSocket(): UseWebSocketReturn {
     ws.onclose = () => {
       console.log("[WebSocket] Disconnected");
       setIsConnected(false);
+      setAutoProceed(null);
       setState({
         phase: "waiting",
         currentSpeaker: null,
@@ -226,6 +246,7 @@ export function useWebSocket(): UseWebSocketReturn {
       persona?: PersonaConfig
     ) => {
       setIsLoading(true);
+      setAutoProceed(null);
       setState((prev) => ({ ...prev, mode }));
       send({ type: "start_session", mode, pattern, japaneseLevel, persona });
     },
@@ -303,6 +324,14 @@ export function useWebSocket(): UseWebSocketReturn {
     send({ type: "audio_playback_done" });
   }, [send]);
 
+  const pauseAutoProceed = useCallback(() => {
+    send({ type: "auto_proceed_pause" });
+  }, [send]);
+
+  const resumeAutoProceed = useCallback(() => {
+    send({ type: "auto_proceed_resume" });
+  }, [send]);
+
   const clearAudioQueue = useCallback(() => {
     setAudioQueue([]);
   }, []);
@@ -355,6 +384,9 @@ export function useWebSocket(): UseWebSocketReturn {
     resetAudioDone,
     evaluationResult,
     clearEvaluationResult,
+    autoProceed,
+    pauseAutoProceed,
+    resumeAutoProceed,
   };
 }
 

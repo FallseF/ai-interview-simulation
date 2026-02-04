@@ -38,6 +38,9 @@ function App() {
     resetAudioDone,
     notifyAudioPlaybackDone,
     evaluationResult,
+    autoProceed,
+    pauseAutoProceed,
+    resumeAutoProceed,
   } = useWebSocket();
 
   const { playAudio } = useAudioPlayer();
@@ -206,6 +209,9 @@ function App() {
             onStartSpeaking={handleStartSpeaking}
             onStart={handleStart}
             onRestart={handleRestart}
+            autoProceed={autoProceed}
+            onPauseAutoProceed={pauseAutoProceed}
+            onResumeAutoProceed={resumeAutoProceed}
           />
         )}
 
