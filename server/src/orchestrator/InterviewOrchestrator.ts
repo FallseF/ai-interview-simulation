@@ -418,6 +418,7 @@ export class InterviewOrchestrator {
   }
 
   private handleHumanText(target: Target, text: string): void {
+    this.clearAutoProceedTimer();
     this.turnManager.onHumanSpeakStart();
     this.sendTurnState();
 
@@ -457,6 +458,7 @@ export class InterviewOrchestrator {
   }
 
   private handleHumanAudioChunk(target: Target, audioBase64: string): void {
+    this.clearAutoProceedTimer();
     if (target === "interviewer" || target === "both") {
       this.interviewerConnection?.appendAudio(audioBase64);
     }
@@ -466,6 +468,7 @@ export class InterviewOrchestrator {
   }
 
   private handleHumanAudioCommit(target: Target): void {
+    this.clearAutoProceedTimer();
     if (target === "interviewer" || target === "both") {
       this.interviewerConnection?.commitAudio();
     }
@@ -536,6 +539,7 @@ export class InterviewOrchestrator {
   }
 
   private handleHumanTranscript(text: string): void {
+    this.clearAutoProceedTimer();
     this.transcriptStore.commit("human", text);
     // DBにトランスクリプトを保存
     this.sessionStore.addTranscript("human", text);
@@ -561,6 +565,7 @@ export class InterviewOrchestrator {
   }
 
   private handleAudioPlaybackDone(): void {
+    this.clearAutoProceedTimer();
     if (this.interviewEnded) {
       this.sendLegacyPhaseChange("ended", undefined, this.endReason || undefined);
       return;
@@ -598,19 +603,11 @@ export class InterviewOrchestrator {
         this.sendTurnState();
         this.sendLegacyPhaseChange("user_choice");
       } else {
-        // Auto mode: パターンに応じた次のスピーカー
-        if (pattern === "pattern2" && this.interviewerConnection) {
-          // pattern2: 面接官が応答
-          this.turnManager.setSpeaker("interviewer");
-          this.sendTurnState();
-          this.sendLegacyPhaseChange("interviewer", "田中部長");
-          this.interviewerConnection.requestResponse();
-        } else {
-          // pattern1 or no interviewer: user choice
-          this.turnManager.onAISpeakingDone("candidate");
-          this.sendTurnState();
-          this.sendLegacyPhaseChange("user_choice");
-        }
+        // Auto mode: 候補者の後は一旦補足の猶予を作る
+        this.turnManager.onAISpeakingDone("candidate");
+        this.sendTurnState();
+        this.sendLegacyPhaseChange("user_choice");
+        this.scheduleAutoProceedAfterCandidate();
       }
     } else if (state.phase === "user_speaking" || state.currentSpeaker === "human") {
       if (isStepMode) {
@@ -643,6 +640,7 @@ export class InterviewOrchestrator {
 
   private handleProceedToNext(): void {
     if (this.interviewEnded) return;
+    this.clearAutoProceedTimer();
 
     const { pattern } = this.patternConfig;
 
@@ -664,6 +662,7 @@ export class InterviewOrchestrator {
   }
 
   private handleUserDoneSpeaking(): void {
+    this.clearAutoProceedTimer();
     const { pattern } = this.patternConfig;
 
     // Commit audio to connected AIs only
@@ -709,6 +708,7 @@ export class InterviewOrchestrator {
   private endInterview(reason: EndReason): void {
     this.interviewEnded = true;
     this.endReason = reason;
+    this.clearAutoProceedTimer();
     this.turnManager.end();
     this.sendTurnState();
 
@@ -799,9 +799,28 @@ export class InterviewOrchestrator {
   }
 
   private cleanup(): void {
+    this.clearAutoProceedTimer();
     this.interviewerConnection?.close();
     this.candidateConnection?.close();
     this.interviewerConnection = null;
     this.candidateConnection = null;
+  }
+
+  private scheduleAutoProceedAfterCandidate(): void {
+    this.clearAutoProceedTimer();
+    this.autoProceedTimer = setTimeout(() => {
+      this.autoProceedTimer = null;
+      if (this.interviewEnded) return;
+      const state = this.turnManager.getState();
+      if (state.phase !== "user_choice") return;
+      this.handleProceedToNext();
+    }, this.autoProceedDelayMs);
+  }
+
+  private clearAutoProceedTimer(): void {
+    if (this.autoProceedTimer) {
+      clearTimeout(this.autoProceedTimer);
+      this.autoProceedTimer = null;
+    }
   }
 }
