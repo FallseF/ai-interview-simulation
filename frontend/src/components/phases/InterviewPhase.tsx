@@ -1,5 +1,5 @@
 import { TranscriptPanel } from "../TranscriptPanel";
-import { CoachPanel, ParticipantsBar } from "../CoachPanel";
+import { CoachPanel } from "../CoachPanel";
 import { TextInput } from "../TextInput";
 import { VoiceInput } from "../VoiceInput";
 import { SessionControls } from "../SessionControls";
@@ -49,9 +49,6 @@ export function InterviewPhase({
 }: InterviewPhaseProps) {
   return (
     <div className="phase-content interview-phase">
-      {/* Participants */}
-      <ParticipantsBar currentSpeaker={state.currentSpeaker} />
-
       {/* Workspace */}
       <div className="workspace">
         <section className="chat-panel">
