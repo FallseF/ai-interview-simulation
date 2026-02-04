@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { PatternSelector } from "../PatternSelector";
 import { PersonaSelector } from "../PersonaSelector";
 import type { InterviewPattern, JapaneseLevel, PersonaConfig } from "../../types/ws";
@@ -5,16 +6,27 @@ import type { InterviewPattern, JapaneseLevel, PersonaConfig } from "../../types
 interface SetupPhaseProps {
   isConnected: boolean;
   isLoading: boolean;
-  onPatternStart: (pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => void;
+  onStart: (pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => void;
   onPersonaSelect: (persona: PersonaConfig) => void;
 }
 
 export function SetupPhase({
   isConnected,
   isLoading,
-  onPatternStart,
+  onStart,
   onPersonaSelect,
 }: SetupPhaseProps) {
+  const [selectedPattern, setSelectedPattern] = useState<InterviewPattern>("pattern2");
+  const [selectedLevel, setSelectedLevel] = useState<JapaneseLevel | undefined>("N4");
+
+  const handlePatternChange = useCallback((pattern: InterviewPattern, level?: JapaneseLevel) => {
+    setSelectedPattern(pattern);
+    setSelectedLevel(level);
+  }, []);
+
+  const handleStart = useCallback(() => {
+    onStart(selectedPattern, selectedLevel);
+  }, [onStart, selectedPattern, selectedLevel]);
   return (
     <div className="phase-content setup-phase">
       <div className="setup-grid">
@@ -23,7 +35,7 @@ export function SetupPhase({
           <PersonaSelector onSelect={onPersonaSelect} />
         </div>
 
-        {/* 右側: 使い方 + 開始ボタン（メイン） */}
+        {/* 右側: 使い方 + パターン選択 */}
         <div className="setup-card">
           <div className="instructions-card">
             <div className="instructions-header">
@@ -65,12 +77,22 @@ export function SetupPhase({
 
           {!isLoading && (
             <PatternSelector
-              onStart={onPatternStart}
+              onChange={handlePatternChange}
               disabled={!isConnected || isLoading}
             />
           )}
         </div>
       </div>
+
+      {/* 枠外にヒーローボタン */}
+      <button
+        className="start-button-hero"
+        onClick={handleStart}
+        disabled={!isConnected || isLoading}
+        type="button"
+      >
+        面接を開始
+      </button>
     </div>
   );
 }

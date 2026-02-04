@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { InterviewPattern, JapaneseLevel } from "../types/ws";
 
 interface PatternSelectorProps {
-  onStart: (pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => void;
+  onChange: (pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => void;
   disabled?: boolean;
 }
 
@@ -41,7 +41,7 @@ const japaneseLevels: { value: JapaneseLevel; label: string }[] = [
 ];
 
 export function PatternSelector({
-  onStart,
+  onChange,
   disabled = false,
 }: PatternSelectorProps) {
   const [selectedPattern, setSelectedPattern] = useState<InterviewPattern>("pattern2");
@@ -49,12 +49,21 @@ export function PatternSelector({
 
   const showJapaneseLevel = selectedPattern === "pattern1" || selectedPattern === "pattern2";
 
-  const handleStart = () => {
-    if (showJapaneseLevel) {
-      onStart(selectedPattern, japaneseLevel);
+  // パターン変更時に親に通知
+  const handlePatternChange = (pattern: InterviewPattern) => {
+    setSelectedPattern(pattern);
+    const needsLevel = pattern === "pattern1" || pattern === "pattern2";
+    if (needsLevel) {
+      onChange(pattern, japaneseLevel);
     } else {
-      onStart(selectedPattern);
+      onChange(pattern);
     }
+  };
+
+  // 日本語レベル変更時に親に通知
+  const handleLevelChange = (level: JapaneseLevel) => {
+    setJapaneseLevel(level);
+    onChange(selectedPattern, level);
   };
 
   return (
@@ -66,7 +75,7 @@ export function PatternSelector({
           <button
             key={pattern.id}
             className={`pattern-card ${selectedPattern === pattern.id ? "active" : ""}`}
-            onClick={() => setSelectedPattern(pattern.id)}
+            onClick={() => handlePatternChange(pattern.id)}
             disabled={disabled}
             type="button"
           >
@@ -90,7 +99,7 @@ export function PatternSelector({
             id="japanese-level"
             className="japanese-level-select"
             value={japaneseLevel}
-            onChange={(e) => setJapaneseLevel(e.target.value as JapaneseLevel)}
+            onChange={(e) => handleLevelChange(e.target.value as JapaneseLevel)}
             disabled={disabled}
           >
             {japaneseLevels.map((level) => (
@@ -101,15 +110,6 @@ export function PatternSelector({
           </select>
         </div>
       )}
-
-      <button
-        className="control-btn start"
-        onClick={handleStart}
-        disabled={disabled}
-        type="button"
-      >
-        面接を開始
-      </button>
     </div>
   );
 }

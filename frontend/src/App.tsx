@@ -55,7 +55,6 @@ function App() {
       : "進行中"
     : "未接続";
   const statusTone = isConnected ? "ok" : "off";
-  const modeLabel = "オート";
 
   // Track if we're currently playing audio
   const isPlayingRef = useRef(false);
@@ -171,7 +170,6 @@ function App() {
           </div>
           <div className="header-status">
             <span className={`status-pill ${statusTone}`}>{statusLabel}</span>
-            <span className="mode-pill">モード: {modeLabel}</span>
             <button className="history-btn" onClick={() => setHistoryOpen(true)}>
               履歴
             </button>
@@ -188,7 +186,7 @@ function App() {
           <SetupPhase
             isConnected={isConnected}
             isLoading={isLoading}
-            onPatternStart={handlePatternStart}
+            onStart={handlePatternStart}
             onPersonaSelect={handlePersonaSelect}
           />
         )}

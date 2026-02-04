@@ -67,7 +67,7 @@ describe("App persona integration", () => {
 
     expect(startSessionMock).toHaveBeenCalledTimes(1);
     expect(startSessionMock).toHaveBeenCalledWith(
-      "step",
+      "auto",
       "pattern2",
       "N4",
       {

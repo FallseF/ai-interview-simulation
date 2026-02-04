@@ -1,10 +1,10 @@
-import type { InterviewMode, InterviewState } from "../types/ws";
+import type { InterviewState } from "../types/ws";
 
 interface SessionControlsProps {
   state: InterviewState;
   isConnected: boolean;
   isLoading: boolean;
-  onStart: (mode: InterviewMode) => void;
+  onStart: () => void;
   onRestart: () => void;
 }
 
@@ -30,7 +30,7 @@ export function SessionControls({
           <>
             <button
               className="control-btn start"
-              onClick={() => onStart("auto")}
+              onClick={onStart}
               disabled={!isConnected || isLoading}
             >
               面接を開始

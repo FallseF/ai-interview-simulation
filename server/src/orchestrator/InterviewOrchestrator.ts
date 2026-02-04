@@ -48,6 +48,8 @@ export class InterviewOrchestrator {
 
   // モックモード時のカスタムシナリオ（オプション）
   private mockScenario?: MockScenario;
+  private autoProceedTimer: NodeJS.Timeout | null = null;
+  private readonly autoProceedDelayMs = 4000;
 
   constructor(
     clientSocket: WebSocket,
@@ -326,6 +328,7 @@ export class InterviewOrchestrator {
         break;
 
       case "user_will_speak":
+        this.clearAutoProceedTimer();
         this.turnManager.onHumanSpeakStart();
         this.sendTurnState();
         // Legacy phase change
