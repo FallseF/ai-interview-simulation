@@ -18,6 +18,12 @@ export function SetupPhase({
   return (
     <div className="phase-content setup-phase">
       <div className="setup-grid">
+        {/* 左側: ペルソナ設定（オプショナル） */}
+        <div className="setup-card">
+          <PersonaSelector onSelect={onPersonaSelect} />
+        </div>
+
+        {/* 右側: 使い方 + 開始ボタン（メイン） */}
         <div className="setup-card">
           <div className="instructions-card">
             <div className="instructions-header">
@@ -63,10 +69,6 @@ export function SetupPhase({
               disabled={!isConnected || isLoading}
             />
           )}
-        </div>
-
-        <div className="setup-card">
-          <PersonaSelector onSelect={onPersonaSelect} />
         </div>
       </div>
     </div>
