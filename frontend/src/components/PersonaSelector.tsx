@@ -195,18 +195,21 @@ export function PersonaSelector({
 
   return (
     <div className="persona-selector">
-      <h3>ペルソナ設定</h3>
+      <div className="persona-header">
+        <h3>ペルソナ設定</h3>
+        <p>面接官・候補者の性格や難易度を調整</p>
+      </div>
 
       {/* モード切り替え */}
-      <div className="mode-toggle">
+      <div className="persona-mode-toggle">
         <button
-          className={mode === "preset" ? "active" : ""}
+          className={`persona-mode-btn ${mode === "preset" ? "active" : ""}`}
           onClick={() => setMode("preset")}
         >
           プリセット
         </button>
         <button
-          className={mode === "custom" ? "active" : ""}
+          className={`persona-mode-btn ${mode === "custom" ? "active" : ""}`}
           onClick={() => setMode("custom")}
         >
           カスタム
@@ -236,7 +239,7 @@ export function PersonaSelector({
             <div className="persona-group">
               <h4>面接官AI</h4>
 
-              <label>
+              <label className="persona-field">
                 性別
                 <select
                   value={interviewer.gender}
@@ -252,7 +255,7 @@ export function PersonaSelector({
                 </select>
               </label>
 
-              <label>
+              <label className="persona-field">
                 業種
                 <select
                   value={interviewer.industry}
@@ -268,7 +271,7 @@ export function PersonaSelector({
                 </select>
               </label>
 
-              <label>
+              <label className="persona-field">
                 性格
                 <select
                   value={interviewer.personality}
@@ -287,7 +290,7 @@ export function PersonaSelector({
                 </select>
               </label>
 
-              <label>
+              <label className="persona-field">
                 外国人雇用の理解度
                 <select
                   value={interviewer.foreignHiringLiteracy}
@@ -306,7 +309,7 @@ export function PersonaSelector({
                 </select>
               </label>
 
-              <label>
+              <label className="persona-field">
                 方言
                 <select
                   value={interviewer.dialect}
@@ -322,7 +325,7 @@ export function PersonaSelector({
                 </select>
               </label>
 
-              <label>
+              <label className="persona-field">
                 難易度
                 <select
                   value={interviewer.difficulty}
@@ -347,7 +350,7 @@ export function PersonaSelector({
             <div className="persona-group">
               <h4>外国人候補者AI</h4>
 
-              <label>
+              <label className="persona-field">
                 日本語レベル
                 <select
                   value={candidate.japaneseLevel}
@@ -366,7 +369,7 @@ export function PersonaSelector({
                 </select>
               </label>
 
-              <label className="checkbox-label">
+              <label className="persona-field checkbox-field">
                 <input
                   type="checkbox"
                   checked={candidate.workExperience ?? false}
@@ -381,143 +384,9 @@ export function PersonaSelector({
         </div>
       )}
 
-      <button className="apply-btn" onClick={handleApply}>
-        この設定で開始
+      <button className="persona-apply-btn" onClick={handleApply}>
+        設定を保存
       </button>
-
-      <style>{`
-        .persona-selector {
-          background: #1a1a1a;
-          border-radius: 12px;
-          padding: 20px;
-          color: #fff;
-        }
-
-        .persona-selector h3 {
-          margin: 0 0 16px 0;
-          font-size: 18px;
-        }
-
-        .mode-toggle {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 16px;
-        }
-
-        .mode-toggle button {
-          flex: 1;
-          padding: 8px 16px;
-          border: 1px solid #333;
-          background: transparent;
-          color: #888;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .mode-toggle button.active {
-          background: #333;
-          color: #fff;
-          border-color: #4ade80;
-        }
-
-        .preset-list {
-          display: grid;
-          gap: 12px;
-        }
-
-        .preset-card {
-          padding: 12px 16px;
-          border: 1px solid #333;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .preset-card:hover {
-          border-color: #666;
-        }
-
-        .preset-card.selected {
-          border-color: #4ade80;
-          background: rgba(74, 222, 128, 0.1);
-        }
-
-        .preset-name {
-          font-weight: bold;
-          margin-bottom: 4px;
-        }
-
-        .preset-description {
-          font-size: 12px;
-          color: #888;
-        }
-
-        .custom-section {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        .persona-group {
-          border: 1px solid #333;
-          border-radius: 8px;
-          padding: 16px;
-        }
-
-        .persona-group h4 {
-          margin: 0 0 12px 0;
-          font-size: 14px;
-          color: #4ade80;
-        }
-
-        .persona-group label {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          margin-bottom: 12px;
-          font-size: 12px;
-          color: #888;
-        }
-
-        .persona-group select {
-          padding: 8px 12px;
-          border: 1px solid #333;
-          border-radius: 6px;
-          background: #222;
-          color: #fff;
-          font-size: 14px;
-        }
-
-        .checkbox-label {
-          flex-direction: row !important;
-          align-items: center;
-          gap: 8px !important;
-        }
-
-        .checkbox-label input {
-          width: 16px;
-          height: 16px;
-        }
-
-        .apply-btn {
-          width: 100%;
-          padding: 12px;
-          margin-top: 16px;
-          border: none;
-          border-radius: 8px;
-          background: #4ade80;
-          color: #000;
-          font-size: 16px;
-          font-weight: bold;
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-
-        .apply-btn:hover {
-          background: #22c55e;
-        }
-      `}</style>
     </div>
   );
 }

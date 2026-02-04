@@ -168,23 +168,26 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.8);
+          background: rgba(15, 23, 42, 0.55);
           display: flex;
           justify-content: center;
           align-items: center;
           z-index: 1000;
           overflow-y: auto;
           padding: 20px;
+          backdrop-filter: blur(8px);
         }
 
         .evaluation-panel {
-          background: #1a1a1a;
-          border-radius: 12px;
+          background: #ffffff;
+          border-radius: 18px;
           max-width: 600px;
           width: 100%;
           max-height: 90vh;
           overflow-y: auto;
-          color: #fff;
+          color: #17181a;
+          border: 1px solid rgba(15, 23, 42, 0.15);
+          box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
         }
 
         .evaluation-header {
@@ -192,7 +195,7 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
           justify-content: space-between;
           align-items: center;
           padding: 20px;
-          border-bottom: 1px solid #333;
+          border-bottom: 1px solid rgba(15, 23, 42, 0.1);
         }
 
         .evaluation-header h2 {
@@ -203,19 +206,19 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
         .close-btn {
           background: none;
           border: none;
-          color: #888;
+          color: #6b7280;
           font-size: 24px;
           cursor: pointer;
         }
 
         .close-btn:hover {
-          color: #fff;
+          color: #111827;
         }
 
         .evaluation-summary {
           padding: 20px;
           text-align: center;
-          border-bottom: 1px solid #333;
+          border-bottom: 1px solid rgba(15, 23, 42, 0.1);
         }
 
         .grade-section {
@@ -237,7 +240,7 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
 
         .grade-message {
           font-size: 14px;
-          color: #888;
+          color: #6b7280;
         }
 
         .score-section {
@@ -245,7 +248,7 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
         }
 
         .score-bar-container {
-          background: #333;
+          background: rgba(15, 23, 42, 0.1);
           border-radius: 8px;
           height: 12px;
           overflow: hidden;
@@ -254,7 +257,7 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
 
         .score-bar {
           height: 100%;
-          background: linear-gradient(90deg, #4ade80, #22c55e);
+          background: linear-gradient(120deg, #0f766e, #10b981);
           border-radius: 8px;
           transition: width 0.5s ease;
         }
@@ -262,10 +265,11 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
         .score-text {
           font-size: 18px;
           font-weight: bold;
+          color: #111827;
         }
 
         .pass-status {
-          font-size: 24px;
+          font-size: 20px;
           font-weight: bold;
           padding: 8px 16px;
           border-radius: 8px;
@@ -273,28 +277,28 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
         }
 
         .pass-status.passed {
-          background: rgba(74, 222, 128, 0.2);
-          color: #4ade80;
+          background: rgba(5, 150, 105, 0.15);
+          color: #047857;
         }
 
         .pass-status.failed {
           background: rgba(248, 113, 113, 0.2);
-          color: #f87171;
+          color: #b91c1c;
         }
 
         .evaluation-section {
           padding: 16px 20px;
-          border-bottom: 1px solid #333;
+          border-bottom: 1px solid rgba(15, 23, 42, 0.08);
         }
 
         .evaluation-section h3 {
           margin: 0 0 12px 0;
           font-size: 16px;
-          color: #888;
+          color: #6b7280;
         }
 
         .evaluation-section.critical {
-          background: rgba(248, 113, 113, 0.1);
+          background: rgba(185, 28, 28, 0.08);
         }
 
         .summary-text {
@@ -321,7 +325,7 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
 
         .category-bar-container {
           flex: 1;
-          background: #333;
+          background: rgba(15, 23, 42, 0.1);
           border-radius: 4px;
           height: 8px;
           overflow: hidden;
@@ -351,15 +355,15 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
         }
 
         .feedback-list.strengths li {
-          color: #4ade80;
+          color: #047857;
         }
 
         .feedback-list.improvements li {
-          color: #fbbf24;
+          color: #b45309;
         }
 
         .feedback-list.critical-list li {
-          color: #f87171;
+          color: #b91c1c;
         }
 
         .feedback-list li strong {
@@ -370,7 +374,7 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
         .feedback-list li p {
           margin: 0;
           font-size: 14px;
-          color: #888;
+          color: #6b7280;
         }
 
         .action-list {
@@ -388,7 +392,9 @@ export function EvaluationPanel({ result, onClose }: EvaluationPanelProps) {
           display: flex;
           justify-content: space-between;
           font-size: 12px;
-          color: #666;
+          color: #6b7280;
+          flex-wrap: wrap;
+          gap: 8px;
         }
       `}</style>
     </div>

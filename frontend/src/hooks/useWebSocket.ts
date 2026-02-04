@@ -9,6 +9,7 @@ import type {
   InterviewPattern,
   JapaneseLevel,
   EvaluationResult,
+  PersonaConfig,
 } from "../types/ws";
 
 interface UseWebSocketReturn {
@@ -23,7 +24,12 @@ interface UseWebSocketReturn {
   // Actions
   connect: () => void;
   disconnect: () => void;
-  startSession: (mode: InterviewMode, pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => void;
+  startSession: (
+    mode: InterviewMode,
+    pattern: InterviewPattern,
+    japaneseLevel?: JapaneseLevel,
+    persona?: PersonaConfig
+  ) => void;
   setMode: (mode: InterviewMode) => void;
   nextTurn: () => void;
   sendText: (target: Target, text: string) => void;
@@ -213,10 +219,15 @@ export function useWebSocket(): UseWebSocketReturn {
 
   // Actions
   const startSession = useCallback(
-    (mode: InterviewMode, pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => {
+    (
+      mode: InterviewMode,
+      pattern: InterviewPattern,
+      japaneseLevel?: JapaneseLevel,
+      persona?: PersonaConfig
+    ) => {
       setIsLoading(true);
       setState((prev) => ({ ...prev, mode }));
-      send({ type: "start_session", mode, pattern, japaneseLevel });
+      send({ type: "start_session", mode, pattern, japaneseLevel, persona });
     },
     [send]
   );

@@ -9,7 +9,14 @@ import { TranscriptPanel } from "./components/TranscriptPanel";
 import { CoachPanel, ParticipantsBar } from "./components/CoachPanel";
 import { AudioTestPanel } from "./components/AudioTestPanel";
 import { EvaluationPanel } from "./components/EvaluationPanel";
-import type { Target, InterviewMode, InterviewPattern, JapaneseLevel } from "./types/ws";
+import { PersonaSelector } from "./components/PersonaSelector";
+import type {
+  Target,
+  InterviewMode,
+  InterviewPattern,
+  JapaneseLevel,
+  PersonaConfig,
+} from "./types/ws";
 import { PatternSelector } from "./components/PatternSelector";
 
 // 開発モードかどうか
@@ -43,6 +50,14 @@ function App() {
   const { playAudio } = useAudioPlayer();
   const [selectedTarget, setSelectedTarget] = useState<Target>("both");
   const [localMode, setLocalMode] = useState<InterviewMode>("step");
+  const [personaConfig, setPersonaConfig] = useState<PersonaConfig | null>(null);
+  const statusLabel = isConnected
+    ? state.phase === "waiting"
+      ? "待機中"
+      : "進行中"
+    : "未接続";
+  const statusTone = isConnected ? "ok" : "off";
+  const modeLabel = localMode === "auto" ? "オート" : "ステップ";
 
   // Track if we're currently playing audio
   const isPlayingRef = useRef(false);
@@ -86,17 +101,17 @@ function App() {
   // Handle start session (from PatternSelector)
   const handlePatternStart = useCallback(
     (pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => {
-      startSession(localMode, pattern, japaneseLevel);
+      startSession(localMode, pattern, japaneseLevel, personaConfig || undefined);
     },
-    [startSession, localMode]
+    [startSession, localMode, personaConfig]
   );
 
   // Handle start session (legacy, for SessionControls - uses default pattern)
   const handleStart = useCallback(
     (mode: InterviewMode) => {
-      startSession(mode, "pattern2", "N4");
+      startSession(mode, "pattern2", "N4", personaConfig || undefined);
     },
-    [startSession]
+    [startSession, personaConfig]
   );
 
   // Handle mode change
@@ -145,6 +160,10 @@ function App() {
     userWillSpeak();
   }, [userWillSpeak]);
 
+  const handlePersonaSelect = useCallback((persona: PersonaConfig) => {
+    setPersonaConfig(persona);
+  }, []);
+
   // Determine if input should be enabled
   const canInput =
     state.phase === "user_choice" ||
@@ -156,107 +175,134 @@ function App() {
       {/* Header */}
       <header className="header">
         <div className="header-content">
-          <h1 className="header-title">面接シミュレーション</h1>
+          <div className="brand">
+            <div className="brand-mark">AI</div>
+            <div className="brand-text">
+              <h1 className="header-title">面接シミュレーション</h1>
+              <p className="header-subtitle">2 AI + 1 Human orchestration</p>
+            </div>
+          </div>
+          <div className="header-status">
+            <span className={`status-pill ${statusTone}`}>{statusLabel}</span>
+            <span className="mode-pill">モード: {modeLabel}</span>
+          </div>
         </div>
       </header>
 
       <div className="main-container">
-        {/* Instructions */}
+        {/* Setup (waiting state only) */}
         {state.phase === "waiting" && (
-          <div className="instructions-card">
-            <div className="instructions-header">
-              <div className="instructions-icon-wrapper">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" x2="12" y1="16" y2="12" />
-                  <line x1="12" x2="12.01" y1="8" y2="8" />
-                </svg>
+          <div className="setup-grid">
+            <div className="setup-card">
+              <div className="instructions-card">
+                <div className="instructions-header">
+                  <div className="instructions-icon-wrapper">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" x2="12" y1="16" y2="12" />
+                      <line x1="12" x2="12.01" y1="8" y2="8" />
+                    </svg>
+                  </div>
+                  <span className="instructions-title">使い方</span>
+                </div>
+                <p className="instructions-text">
+                  あなたは<strong>転職支援エージェント</strong>として、外国人求職者の面接をサポートします。
+                </p>
+                <div className="instructions-list">
+                  <div className="instruction-item">
+                    <span className="instruction-number">1</span>
+                    <span>面接パターンと日本語レベルを選択して開始</span>
+                  </div>
+                  <div className="instruction-item">
+                    <span className="instruction-number">2</span>
+                    <span>求職者の回答後、テキストまたは音声で補足できます</span>
+                  </div>
+                  <div className="instruction-item">
+                    <span className="instruction-number">3</span>
+                    <span>補足の送り先（面接官のみ/求職者のみ/両方）を選択できます</span>
+                  </div>
+                </div>
               </div>
-              <span className="instructions-title">使い方</span>
+
+              {!isLoading && (
+                <PatternSelector
+                  onStart={handlePatternStart}
+                  disabled={!isConnected || isLoading}
+                />
+              )}
             </div>
-            <p className="instructions-text">
-              あなたは<strong>転職支援エージェント</strong>として、外国人求職者の面接をサポートします。
-            </p>
-            <div className="instructions-list">
-              <div className="instruction-item">
-                <span className="instruction-number">1</span>
-                <span>面接パターンと日本語レベルを選択して開始</span>
-              </div>
-              <div className="instruction-item">
-                <span className="instruction-number">2</span>
-                <span>求職者の回答後、テキストまたは音声で補足できます</span>
-              </div>
-              <div className="instruction-item">
-                <span className="instruction-number">3</span>
-                <span>補足の送り先（面接官のみ/求職者のみ/両方）を選択できます</span>
-              </div>
+
+            <div className="setup-card">
+              <PersonaSelector onSelect={handlePersonaSelect} />
             </div>
           </div>
-        )}
-
-        {/* Pattern Selector (waiting state only) */}
-        {state.phase === "waiting" && !isLoading && (
-          <PatternSelector
-            onStart={handlePatternStart}
-            disabled={!isConnected || isLoading}
-          />
         )}
 
         {/* Participants */}
         <ParticipantsBar currentSpeaker={state.currentSpeaker} />
 
-        {/* Chat Container */}
-        <div className="chat-container">
-          {/* Transcript */}
-          <TranscriptPanel
-            transcripts={transcripts}
-            currentSpeaker={state.currentSpeaker}
-          />
-
-          {/* Phase Indicator */}
-          <CoachPanel state={state} />
-
-          {/* Target Selector (when input is enabled) */}
-          {canInput && state.phase !== "ended" && (
-            <TargetSelector
-              selectedTarget={selectedTarget}
-              onTargetChange={setSelectedTarget}
-              disabled={state.phase === "user_speaking"}
+        {/* Workspace */}
+        <div className="workspace">
+          <section className="chat-panel">
+            <div className="panel-header">
+              <div className="panel-title">会話ログ</div>
+              <div className="panel-meta">{transcripts.length} entries</div>
+            </div>
+            <TranscriptPanel
+              transcripts={transcripts}
+              currentSpeaker={state.currentSpeaker}
             />
-          )}
+          </section>
 
-          {/* Input Controls */}
-          {canInput && state.phase !== "ended" && (
-            <>
-              {state.phase !== "user_speaking" && (
-                <TextInput
-                  target={selectedTarget}
-                  onSend={handleSendText}
-                  placeholder="補足を入力..."
+          <aside className="control-panel">
+            <div className="panel-header">
+              <div className="panel-title">操作パネル</div>
+              <div className="panel-meta">進行と補足</div>
+            </div>
+
+            <div className="panel-body">
+              <CoachPanel state={state} />
+
+              {canInput && state.phase !== "ended" && (
+                <TargetSelector
+                  selectedTarget={selectedTarget}
+                  onTargetChange={setSelectedTarget}
+                  disabled={state.phase === "user_speaking"}
                 />
               )}
-              <div className="action-buttons visible">
-                <VoiceInput
-                  target={selectedTarget}
-                  onAudioChunk={handleAudioChunk}
-                  onCommit={handleCommitAudio}
-                  onStartSpeaking={handleStartSpeaking}
-                />
-              </div>
-            </>
-          )}
 
-          {/* Session Controls */}
-          <SessionControls
-            state={{ ...state, mode: localMode }}
-            isConnected={isConnected}
-            isLoading={isLoading}
-            onStart={handleStart}
-            onModeChange={handleModeChange}
-            onNextTurn={nextTurn}
-            onProceedToNext={proceedToNext}
-            onRestart={handleRestart}
-          />
+              {canInput && state.phase !== "ended" && (
+                <>
+                  {state.phase !== "user_speaking" && (
+                    <TextInput
+                      target={selectedTarget}
+                      onSend={handleSendText}
+                      placeholder="補足を入力..."
+                    />
+                  )}
+                  <div className="action-buttons visible">
+                    <VoiceInput
+                      target={selectedTarget}
+                      onAudioChunk={handleAudioChunk}
+                      onCommit={handleCommitAudio}
+                      onStartSpeaking={handleStartSpeaking}
+                    />
+                  </div>
+                </>
+              )}
+
+              <SessionControls
+                state={{ ...state, mode: localMode }}
+                isConnected={isConnected}
+                isLoading={isLoading}
+                onStart={handleStart}
+                onModeChange={handleModeChange}
+                onNextTurn={nextTurn}
+                onProceedToNext={proceedToNext}
+                onRestart={handleRestart}
+              />
+            </div>
+          </aside>
         </div>
       </div>
 
