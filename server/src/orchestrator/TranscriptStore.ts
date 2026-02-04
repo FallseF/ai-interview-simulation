@@ -2,6 +2,7 @@ import type { Speaker } from "../types/roles.js";
 
 export interface TranscriptEntry {
   speaker: Speaker;
+  name?: string;
   text: string;
   timestamp: Date;
 }

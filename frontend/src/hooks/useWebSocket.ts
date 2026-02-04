@@ -6,6 +6,9 @@ import type {
   InterviewState,
   Target,
   InterviewMode,
+  InterviewPattern,
+  JapaneseLevel,
+  EvaluationResult,
 } from "../types/ws";
 
 interface UseWebSocketReturn {
@@ -20,7 +23,7 @@ interface UseWebSocketReturn {
   // Actions
   connect: () => void;
   disconnect: () => void;
-  startSession: (mode: InterviewMode) => void;
+  startSession: (mode: InterviewMode, pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => void;
   setMode: (mode: InterviewMode) => void;
   nextTurn: () => void;
   sendText: (target: Target, text: string) => void;
@@ -38,6 +41,13 @@ interface UseWebSocketReturn {
   // Audio playback
   audioQueue: { speaker: string; data: string }[];
   clearAudioQueue: () => void;
+  shiftAudioQueue: () => void;
+  audioDone: boolean;
+  resetAudioDone: () => void;
+
+  // Evaluation
+  evaluationResult: EvaluationResult | null;
+  clearEvaluationResult: () => void;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -46,6 +56,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [audioQueue, setAudioQueue] = useState<{ speaker: string; data: string }[]>([]);
+  const [audioDone, setAudioDone] = useState(false);
 
   const [state, setState] = useState<InterviewState>({
     phase: "waiting",
@@ -53,6 +64,7 @@ export function useWebSocket(): UseWebSocketReturn {
     waitingForNext: false,
     mode: "step",
   });
+  const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
 
   // Generate unique ID for transcript entries
   const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -70,6 +82,8 @@ export function useWebSocket(): UseWebSocketReturn {
           ...prev,
           currentSpeaker: data.currentSpeaker,
           waitingForNext: data.waitingForNext,
+          phase: (data.phase as InterviewState["phase"]) || prev.phase,
+          mode: data.mode || prev.mode,
         }));
         break;
 
@@ -117,6 +131,7 @@ export function useWebSocket(): UseWebSocketReturn {
 
       case "audio_done":
         // Audio generation complete for this speaker
+        setAudioDone(true);
         break;
 
       case "phase_change":
@@ -129,6 +144,11 @@ export function useWebSocket(): UseWebSocketReturn {
 
       case "waiting_for_sessions":
         setIsLoading(true);
+        break;
+
+      case "evaluation_result":
+        console.log("[WebSocket] Evaluation result received");
+        setEvaluationResult(data.result);
         break;
 
       case "error":
@@ -193,10 +213,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
   // Actions
   const startSession = useCallback(
-    (mode: InterviewMode) => {
+    (mode: InterviewMode, pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => {
       setIsLoading(true);
       setState((prev) => ({ ...prev, mode }));
-      send({ type: "start_session", mode });
+      send({ type: "start_session", mode, pattern, japaneseLevel });
     },
     [send]
   );
@@ -287,6 +307,21 @@ export function useWebSocket(): UseWebSocketReturn {
     setAudioQueue([]);
   }, []);
 
+  // Remove only the first item from the queue
+  const shiftAudioQueue = useCallback(() => {
+    setAudioQueue((prev) => prev.slice(1));
+  }, []);
+
+  // Reset audio done flag
+  const resetAudioDone = useCallback(() => {
+    setAudioDone(false);
+  }, []);
+
+  // Clear evaluation result
+  const clearEvaluationResult = useCallback(() => {
+    setEvaluationResult(null);
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -315,6 +350,11 @@ export function useWebSocket(): UseWebSocketReturn {
     notifyAudioPlaybackDone,
     audioQueue,
     clearAudioQueue,
+    shiftAudioQueue,
+    audioDone,
+    resetAudioDone,
+    evaluationResult,
+    clearEvaluationResult,
   };
 }
 

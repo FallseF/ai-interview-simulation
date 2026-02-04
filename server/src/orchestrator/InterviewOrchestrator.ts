@@ -1,16 +1,25 @@
 import WebSocket from "ws";
-import type { Speaker, Target, InterviewMode, EndReason } from "../types/roles.js";
-import type { ClientMessage, ServerMessage } from "../types/ws.js";
-import { INTERVIEW_CONFIG } from "../config.js";
-import { OpenAIRealtimeConnection } from "../realtime/openaiWs.js";
-import { createSessionConfigs } from "../realtime/sessionFactory.js";
+import type { Speaker, Target, InterviewMode, EndReason, PatternConfig, AIPersonaConfig } from "../types/roles.js";
+import type { ClientMessage, ServerMessage, EvaluationResultMessage } from "../types/ws.js";
+import { INTERVIEW_CONFIG, MOCK_MODE } from "../config.js";
+import { OpenAIRealtimeConnection, type OpenAIConnectionCallbacks } from "../realtime/openaiWs.js";
+import { MockOpenAIRealtimeConnection, type MockScenario } from "../realtime/mockOpenaiWs.js";
 import { TurnManager } from "./TurnManager.js";
 import { TranscriptStore } from "./TranscriptStore.js";
+import { Evaluator } from "../evaluation/Evaluator.js";
+import { FeedbackFormatter } from "../evaluation/FeedbackFormatter.js";
+// Pattern-specific configurations
+import { createPattern1StudentConfig } from "../prompts/patterns/pattern1.js";
+import { createPattern2InterviewerConfig, createPattern2StudentConfig } from "../prompts/patterns/pattern2.js";
+import { createPattern3InterviewerConfig } from "../prompts/patterns/pattern3.js";
+
+// 接続のインターフェース型（本物とモックで共通）
+type AIConnection = OpenAIRealtimeConnection | MockOpenAIRealtimeConnection;
 
 export class InterviewOrchestrator {
   private clientSocket: WebSocket;
-  private interviewerConnection: OpenAIRealtimeConnection | null = null;
-  private candidateConnection: OpenAIRealtimeConnection | null = null;
+  private interviewerConnection: AIConnection | null = null;
+  private candidateConnection: AIConnection | null = null;
 
   private turnManager: TurnManager;
   private transcriptStore: TranscriptStore;
@@ -24,13 +33,30 @@ export class InterviewOrchestrator {
 
   private currentTranscriptBuffer = "";
 
-  constructor(clientSocket: WebSocket, mode: InterviewMode = "step") {
+  // パターン設定
+  private patternConfig: PatternConfig;
+
+  // モックモード時のカスタムシナリオ（オプション）
+  private mockScenario?: MockScenario;
+
+  constructor(
+    clientSocket: WebSocket,
+    patternConfig: PatternConfig,
+    mode: InterviewMode = "step",
+    mockScenario?: MockScenario
+  ) {
     this.clientSocket = clientSocket;
+    this.patternConfig = patternConfig;
     this.turnManager = new TurnManager(mode);
     this.transcriptStore = new TranscriptStore();
+    this.mockScenario = mockScenario;
 
     this.setupClientHandlers();
     this.setupAIConnections();
+
+    // Automatically start interview when AI connections are ready
+    // startInterview() will set pendingStart=true if connections aren't ready yet
+    this.startInterview();
   }
 
   private setupClientHandlers(): void {
@@ -53,52 +79,140 @@ export class InterviewOrchestrator {
     });
   }
 
+  /**
+   * Get AI configurations based on the current pattern
+   */
+  private getPatternConfigs(): { interviewerConfig: AIPersonaConfig | null; candidateConfig: AIPersonaConfig | null } {
+    const { pattern, japaneseLevel } = this.patternConfig;
+    console.log(`[Orchestrator] Getting configs for pattern: ${pattern}, japaneseLevel: ${japaneseLevel}`);
+
+    switch (pattern) {
+      case "pattern1":
+        // 営業(human) vs 学生(AI) - 出席確認・自己紹介練習
+        return {
+          interviewerConfig: null,
+          candidateConfig: createPattern1StudentConfig({ japaneseLevel }),
+        };
+      case "pattern2":
+        // 営業(human) vs 学生(AI) vs 面接官(AI) - 面接本番
+        const candidateConfig = createPattern2StudentConfig({ japaneseLevel });
+        console.log(`[Orchestrator] Candidate instructions preview (first 500 chars):`);
+        console.log(candidateConfig.instructions.substring(0, 500));
+        return {
+          interviewerConfig: createPattern2InterviewerConfig(),
+          candidateConfig,
+        };
+      case "pattern3":
+        // 営業(human) vs 面接官(AI) - 学生退席後のヒアリング
+        return {
+          interviewerConfig: createPattern3InterviewerConfig(),
+          candidateConfig: null,
+        };
+      default:
+        // Fallback to pattern2
+        return {
+          interviewerConfig: createPattern2InterviewerConfig(),
+          candidateConfig: createPattern2StudentConfig({ japaneseLevel }),
+        };
+    }
+  }
+
   private setupAIConnections(): void {
-    const configs = createSessionConfigs();
+    const { interviewerConfig, candidateConfig } = this.getPatternConfigs();
+    const { participants } = this.patternConfig;
 
-    // Setup interviewer connection
-    this.interviewerConnection = new OpenAIRealtimeConnection(
-      "Interviewer",
-      configs.interviewer,
-      {
-        onSessionReady: () => {
-          this.interviewerReady = true;
-          console.log("[Orchestrator] Interviewer session ready");
-          this.checkAndStartInterview();
-        },
-        onAudioDelta: (audio) => this.handleAudioDelta("interviewer", audio),
-        onAudioDone: () => this.handleAudioDone("interviewer"),
-        onTranscriptDelta: (delta) => this.handleTranscriptDelta("interviewer", delta),
-        onTranscriptDone: (text) => this.handleTranscriptDone("interviewer", text),
-        onInputTranscriptDone: (text) => this.handleHumanTranscript(text),
-        onResponseDone: (status, error) => this.handleResponseDone("interviewer", status, error),
-        onError: (error) => this.handleError(error),
-        onClose: () => this.handleConnectionClose("interviewer"),
+    // パターンに応じて必要な接続を判定
+    const needsInterviewer = participants.includes("interviewer");
+    const needsCandidate = participants.includes("candidate");
+
+    console.log(`[Orchestrator] Pattern: ${this.patternConfig.pattern}, Participants: ${participants.join(", ")}`);
+
+    // 面接官接続が不要な場合は即座にready扱い
+    if (!needsInterviewer) {
+      this.interviewerReady = true;
+    }
+    // 候補者接続が不要な場合は即座にready扱い
+    if (!needsCandidate) {
+      this.candidateReady = true;
+    }
+
+    // 面接官コールバック
+    const interviewerCallbacks: OpenAIConnectionCallbacks = {
+      onSessionReady: () => {
+        this.interviewerReady = true;
+        console.log("[Orchestrator] Interviewer session ready");
+        this.checkAndStartInterview();
+      },
+      onAudioDelta: (audio) => this.handleAudioDelta("interviewer", audio),
+      onAudioDone: () => this.handleAudioDone("interviewer"),
+      onTranscriptDelta: (delta) => this.handleTranscriptDelta("interviewer", delta),
+      onTranscriptDone: (text) => this.handleTranscriptDone("interviewer", text),
+      onInputTranscriptDone: (text) => this.handleHumanTranscript(text),
+      onResponseDone: (status, error) => this.handleResponseDone("interviewer", status, error),
+      onError: (error) => this.handleError(error),
+      onClose: () => this.handleConnectionClose("interviewer"),
+    };
+
+    // 候補者コールバック
+    const candidateCallbacks: OpenAIConnectionCallbacks = {
+      onSessionReady: () => {
+        this.candidateReady = true;
+        console.log("[Orchestrator] Candidate session ready");
+        this.checkAndStartInterview();
+      },
+      onAudioDelta: (audio) => this.handleAudioDelta("candidate", audio),
+      onAudioDone: () => this.handleAudioDone("candidate"),
+      onTranscriptDelta: (delta) => this.handleTranscriptDelta("candidate", delta),
+      onTranscriptDone: (text) => this.handleTranscriptDone("candidate", text),
+      onInputTranscriptDone: (text) => this.handleHumanTranscript(text),
+      onResponseDone: (status, error) => this.handleResponseDone("candidate", status, error),
+      onError: (error) => this.handleError(error),
+      onClose: () => this.handleConnectionClose("candidate"),
+    };
+
+    if (MOCK_MODE) {
+      // モックモード: 本物のAPIに繋がない
+      console.log("[Orchestrator] 🧪 Using mock connections");
+
+      if (needsInterviewer && interviewerConfig) {
+        this.interviewerConnection = new MockOpenAIRealtimeConnection(
+          "Interviewer",
+          interviewerConfig,
+          interviewerCallbacks,
+          this.mockScenario
+        );
+        this.interviewerConnection.connect();
       }
-    );
 
-    // Setup candidate connection
-    this.candidateConnection = new OpenAIRealtimeConnection(
-      "Candidate",
-      configs.candidate,
-      {
-        onSessionReady: () => {
-          this.candidateReady = true;
-          console.log("[Orchestrator] Candidate session ready");
-          this.checkAndStartInterview();
-        },
-        onAudioDelta: (audio) => this.handleAudioDelta("candidate", audio),
-        onAudioDone: () => this.handleAudioDone("candidate"),
-        onTranscriptDelta: (delta) => this.handleTranscriptDelta("candidate", delta),
-        onTranscriptDone: (text) => this.handleTranscriptDone("candidate", text),
-        onResponseDone: (status, error) => this.handleResponseDone("candidate", status, error),
-        onError: (error) => this.handleError(error),
-        onClose: () => this.handleConnectionClose("candidate"),
+      if (needsCandidate && candidateConfig) {
+        this.candidateConnection = new MockOpenAIRealtimeConnection(
+          "Candidate",
+          candidateConfig,
+          candidateCallbacks,
+          this.mockScenario
+        );
+        this.candidateConnection.connect();
       }
-    );
+    } else {
+      // 本番モード: 本物のOpenAI APIに接続
+      if (needsInterviewer && interviewerConfig) {
+        this.interviewerConnection = new OpenAIRealtimeConnection(
+          "Interviewer",
+          interviewerConfig,
+          interviewerCallbacks
+        );
+        this.interviewerConnection.connect();
+      }
 
-    this.interviewerConnection.connect();
-    this.candidateConnection.connect();
+      if (needsCandidate && candidateConfig) {
+        this.candidateConnection = new OpenAIRealtimeConnection(
+          "Candidate",
+          candidateConfig,
+          candidateCallbacks
+        );
+        this.candidateConnection.connect();
+      }
+    }
   }
 
   private handleClientMessage(data: ClientMessage): void {
@@ -168,18 +282,34 @@ export class InterviewOrchestrator {
 
   private startInterview(): void {
     if (this.interviewerReady && this.candidateReady) {
-      console.log("[Orchestrator] Both sessions ready, starting interview");
-      this.sendToClient({ type: "session_ready" });
+      console.log(`[Orchestrator] Sessions ready, starting interview (pattern: ${this.patternConfig.pattern})`);
+      this.sendToClient({
+        type: "session_ready",
+        pattern: this.patternConfig.pattern,
+        japaneseLevel: this.patternConfig.japaneseLevel,
+        participants: this.patternConfig.participants,
+      });
       this.sendToClient({ type: "sessions_ready" }); // Legacy
 
       this.turnManager.start();
       this.sendTurnState();
 
-      // Legacy phase change
-      this.sendLegacyPhaseChange("interviewer", "田中部長");
+      // パターンに応じた開始処理
+      const { pattern } = this.patternConfig;
 
-      // Trigger interviewer to start
-      this.interviewerConnection?.requestResponse();
+      if (pattern === "pattern1") {
+        // pattern1: 候補者（外国人学生）のみ - 候補者から開始
+        this.sendLegacyPhaseChange("maria_speaking", "グエン・ミン");
+        this.candidateConnection?.requestResponse();
+      } else if (pattern === "pattern2") {
+        // pattern2: 両方 - 面接官から開始（従来通り）
+        this.sendLegacyPhaseChange("interviewer", "田中部長");
+        this.interviewerConnection?.requestResponse();
+      } else if (pattern === "pattern3") {
+        // pattern3: 面接官のみ - 面接官から開始
+        this.sendLegacyPhaseChange("interviewer", "田中部長");
+        this.interviewerConnection?.requestResponse();
+      }
     } else {
       console.log("[Orchestrator] Waiting for sessions to be ready...");
       this.pendingStart = true;
@@ -197,16 +327,20 @@ export class InterviewOrchestrator {
   private handleNextTurn(): void {
     if (this.interviewEnded) return;
 
+    // 待機中でなければ無視（多重送信防止）
+    const stateBefore = this.turnManager.getState();
+    if (!stateBefore.waitingForNext) return;
+
     this.turnManager.onNextTurn();
     const state = this.turnManager.getState();
     this.sendTurnState();
 
-    if (state.currentSpeaker === "interviewer") {
+    if (state.currentSpeaker === "interviewer" && this.interviewerConnection) {
       this.sendLegacyPhaseChange("interviewer", "田中部長");
-      this.interviewerConnection?.requestResponse();
-    } else if (state.currentSpeaker === "candidate") {
+      this.interviewerConnection.requestResponse();
+    } else if (state.currentSpeaker === "candidate" && this.candidateConnection) {
       this.sendLegacyPhaseChange("maria_speaking", "グエン・ミン");
-      this.candidateConnection?.requestResponse();
+      this.candidateConnection.requestResponse();
     }
   }
 
@@ -236,10 +370,16 @@ export class InterviewOrchestrator {
     this.turnManager.onHumanSpeakDone();
     this.sendTurnState();
 
-    // Auto trigger interviewer response after human text
+    // Auto trigger response after human text based on pattern
     if (this.turnManager.getMode() === "auto") {
-      this.sendLegacyPhaseChange("interviewer", "田中部長");
-      this.interviewerConnection?.requestResponse();
+      const { pattern } = this.patternConfig;
+      if (pattern === "pattern1" && this.candidateConnection) {
+        this.sendLegacyPhaseChange("maria_speaking", "グエン・ミン");
+        this.candidateConnection.requestResponse();
+      } else if (this.interviewerConnection) {
+        this.sendLegacyPhaseChange("interviewer", "田中部長");
+        this.interviewerConnection.requestResponse();
+      }
     }
   }
 
@@ -262,29 +402,27 @@ export class InterviewOrchestrator {
 
     this.turnManager.onHumanSpeakDone();
     this.sendTurnState();
+
+    // autoモード時にパターンに応じた応答要求
+    if (this.turnManager.getMode() === "auto") {
+      const { pattern } = this.patternConfig;
+      if (pattern === "pattern1" && this.candidateConnection) {
+        this.sendLegacyPhaseChange("maria_speaking", "グエン・ミン");
+        this.candidateConnection.requestResponse();
+      } else if (this.interviewerConnection) {
+        this.sendLegacyPhaseChange("interviewer", "田中部長");
+        this.interviewerConnection.requestResponse();
+      }
+    }
   }
 
   private handleAudioDelta(speaker: Speaker, audioBase64: string): void {
-    const state = this.turnManager.getState();
-
-    // Only send audio if this speaker is currently active
-    if (
-      (speaker === "interviewer" && state.phase === "interviewer") ||
-      (speaker === "candidate" && state.phase === "candidate")
-    ) {
-      this.sendToClient({
-        type: "audio_delta",
-        speaker,
-        audioBase64,
-      });
-
-      // Legacy format
-      this.sendToClient({
-        type: "audio",
-        source: speaker === "interviewer" ? "ai_a" : "ai_b",
-        data: audioBase64,
-      });
-    }
+    // Send audio to client (only new format, no legacy duplicate)
+    this.sendToClient({
+      type: "audio_delta",
+      speaker,
+      audioBase64,
+    });
   }
 
   private handleAudioDone(speaker: Speaker): void {
@@ -307,19 +445,11 @@ export class InterviewOrchestrator {
   }
 
   private handleTranscriptDone(speaker: Speaker, fullText: string): void {
-    const entry = this.transcriptStore.commit(speaker, fullText);
+    this.transcriptStore.commit(speaker, fullText);
 
     this.sendToClient({
       type: "transcript_done",
       speaker,
-      text: fullText,
-    });
-
-    // Legacy format
-    this.sendToClient({
-      type: "transcript",
-      source: speaker === "interviewer" ? "ai_a" : "ai_b",
-      name: speaker === "interviewer" ? "田中部長" : "グエン・ミン",
       text: fullText,
     });
 
@@ -350,13 +480,7 @@ export class InterviewOrchestrator {
         message: `${speaker} response failed: ${errorMessage}`,
       });
     }
-
-    // In step mode, we wait for audio_playback_done from client
-    // In auto mode, we can proceed after response is done
-    if (this.turnManager.getMode() === "auto" && !this.interviewEnded) {
-      this.turnManager.onAISpeakingDone(speaker as "interviewer" | "candidate");
-      this.sendTurnState();
-    }
+    // Turn progression is handled in handleAudioPlaybackDone to prevent double triggers
   }
 
   private handleAudioPlaybackDone(): void {
@@ -366,48 +490,122 @@ export class InterviewOrchestrator {
     }
 
     const state = this.turnManager.getState();
+    const isStepMode = this.turnManager.getMode() === "step";
+    const { pattern } = this.patternConfig;
 
     if (state.phase === "interviewer" || state.currentSpeaker === "interviewer") {
-      // Interviewer finished, candidate responds
-      this.turnManager.setSpeaker("candidate");
-      this.sendTurnState();
-      this.sendLegacyPhaseChange("maria_speaking", "グエン・ミン");
-      this.candidateConnection?.requestResponse();
+      if (isStepMode) {
+        // Step mode: wait for user to proceed
+        this.turnManager.onAISpeakingDone("interviewer");
+        this.sendTurnState();
+        this.sendLegacyPhaseChange("user_choice");
+      } else {
+        // Auto mode: パターンに応じた次のスピーカー
+        if (pattern === "pattern2" && this.candidateConnection) {
+          // pattern2: 候補者が応答
+          this.turnManager.setSpeaker("candidate");
+          this.sendTurnState();
+          this.sendLegacyPhaseChange("maria_speaking", "グエン・ミン");
+          this.candidateConnection.requestResponse();
+        } else {
+          // pattern3 or no candidate: user choice
+          this.turnManager.onAISpeakingDone("interviewer");
+          this.sendTurnState();
+          this.sendLegacyPhaseChange("user_choice");
+        }
+      }
     } else if (state.phase === "candidate" || state.currentSpeaker === "candidate") {
-      // Candidate finished, go to user choice
-      this.turnManager.toUserChoice();
-      this.sendTurnState();
-      this.sendLegacyPhaseChange("user_choice");
+      if (isStepMode) {
+        // Step mode: wait for user to proceed
+        this.turnManager.onAISpeakingDone("candidate");
+        this.sendTurnState();
+        this.sendLegacyPhaseChange("user_choice");
+      } else {
+        // Auto mode: パターンに応じた次のスピーカー
+        if (pattern === "pattern2" && this.interviewerConnection) {
+          // pattern2: 面接官が応答
+          this.turnManager.setSpeaker("interviewer");
+          this.sendTurnState();
+          this.sendLegacyPhaseChange("interviewer", "田中部長");
+          this.interviewerConnection.requestResponse();
+        } else {
+          // pattern1 or no interviewer: user choice
+          this.turnManager.onAISpeakingDone("candidate");
+          this.sendTurnState();
+          this.sendLegacyPhaseChange("user_choice");
+        }
+      }
     } else if (state.phase === "user_speaking" || state.currentSpeaker === "human") {
-      // After user speaking, interviewer responds
-      this.turnManager.setSpeaker("interviewer");
-      this.sendTurnState();
-      this.sendLegacyPhaseChange("interviewer", "田中部長");
-      this.interviewerConnection?.requestResponse();
+      if (isStepMode) {
+        // Step mode: wait for user to proceed
+        this.turnManager.onHumanSpeakDone();
+        this.sendTurnState();
+        this.sendLegacyPhaseChange("user_choice");
+      } else {
+        // Auto mode: パターンに応じた次のスピーカー
+        if (pattern === "pattern1" && this.candidateConnection) {
+          // pattern1: 候補者が応答
+          this.turnManager.setSpeaker("candidate");
+          this.sendTurnState();
+          this.sendLegacyPhaseChange("maria_speaking", "グエン・ミン");
+          this.candidateConnection.requestResponse();
+        } else if (this.interviewerConnection) {
+          // pattern2, pattern3: 面接官が応答
+          this.turnManager.setSpeaker("interviewer");
+          this.sendTurnState();
+          this.sendLegacyPhaseChange("interviewer", "田中部長");
+          this.interviewerConnection.requestResponse();
+        } else {
+          this.turnManager.onHumanSpeakDone();
+          this.sendTurnState();
+          this.sendLegacyPhaseChange("user_choice");
+        }
+      }
     }
   }
 
   private handleProceedToNext(): void {
     if (this.interviewEnded) return;
 
+    const { pattern } = this.patternConfig;
+
     // User chose to proceed without commenting
-    this.turnManager.setSpeaker("interviewer");
-    this.sendTurnState();
-    this.sendLegacyPhaseChange("interviewer", "田中部長");
-    this.interviewerConnection?.requestResponse();
+    // パターンに応じた次のスピーカーを決定
+    if (pattern === "pattern1" && this.candidateConnection) {
+      // pattern1: 候補者のみ
+      this.turnManager.setSpeaker("candidate");
+      this.sendTurnState();
+      this.sendLegacyPhaseChange("maria_speaking", "グエン・ミン");
+      this.candidateConnection.requestResponse();
+    } else if (this.interviewerConnection) {
+      // pattern2, pattern3: 面接官優先
+      this.turnManager.setSpeaker("interviewer");
+      this.sendTurnState();
+      this.sendLegacyPhaseChange("interviewer", "田中部長");
+      this.interviewerConnection.requestResponse();
+    }
   }
 
   private handleUserDoneSpeaking(): void {
-    // Commit audio to both AIs
+    const { pattern } = this.patternConfig;
+
+    // Commit audio to connected AIs only
     this.interviewerConnection?.commitAudio();
     this.candidateConnection?.commitAudio();
 
     this.turnManager.onHumanSpeakDone();
     this.sendTurnState();
 
-    // Interviewer responds after user speaks
-    this.sendLegacyPhaseChange("interviewer", "田中部長");
-    this.interviewerConnection?.requestResponse();
+    // パターンに応じた次のスピーカー
+    if (pattern === "pattern1" && this.candidateConnection) {
+      // pattern1: 候補者が応答
+      this.sendLegacyPhaseChange("maria_speaking", "グエン・ミン");
+      this.candidateConnection.requestResponse();
+    } else if (this.interviewerConnection) {
+      // pattern2, pattern3: 面接官が応答
+      this.sendLegacyPhaseChange("interviewer", "田中部長");
+      this.interviewerConnection.requestResponse();
+    }
   }
 
   private shareContextWithOtherAI(speaker: Speaker, text: string): void {
@@ -436,6 +634,40 @@ export class InterviewOrchestrator {
     this.endReason = reason;
     this.turnManager.end();
     this.sendTurnState();
+
+    // 評価を実行してフィードバックを送信
+    this.performEvaluation();
+  }
+
+  /**
+   * 面接終了後の評価を実行
+   */
+  private performEvaluation(): void {
+    console.log("[Orchestrator] Starting evaluation...");
+
+    try {
+      const evaluator = new Evaluator();
+      const transcripts = this.transcriptStore.getAll();
+      const result = evaluator.evaluate(transcripts);
+
+      // コンソールにテキスト形式で出力
+      console.log("\n" + FeedbackFormatter.toText(result));
+
+      // クライアントにJSON形式で送信
+      const resultJson = FeedbackFormatter.toJSON(result) as EvaluationResultMessage;
+      this.sendToClient({
+        type: "evaluation_result",
+        result: resultJson,
+      });
+
+      console.log("[Orchestrator] Evaluation completed and sent to client");
+    } catch (error) {
+      console.error("[Orchestrator] Evaluation error:", error);
+      this.sendToClient({
+        type: "error",
+        message: `評価中にエラーが発生しました: ${error}`,
+      });
+    }
   }
 
   private handleError(error: Error): void {
@@ -460,8 +692,10 @@ export class InterviewOrchestrator {
 
     this.sendToClient({
       type: "turn_state",
-      currentSpeaker: state.currentSpeaker || "interviewer",
+      currentSpeaker: state.currentSpeaker,
       waitingForNext: state.waitingForNext,
+      phase: state.phase,
+      mode: this.turnManager.getMode(),
     });
   }
 

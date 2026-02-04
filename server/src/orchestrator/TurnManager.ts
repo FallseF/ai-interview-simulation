@@ -8,6 +8,7 @@ export interface TurnState {
   turnCount: number;
   interviewerTurns: number;
   candidateTurns: number;
+  lastAISpeaker: "interviewer" | "candidate" | null;
 }
 
 export class TurnManager {
@@ -18,6 +19,7 @@ export class TurnManager {
   private turnCount = 0;
   private interviewerTurns = 0;
   private candidateTurns = 0;
+  private lastAISpeaker: "interviewer" | "candidate" | null = null;
 
   constructor(mode: InterviewMode = "step") {
     this.mode = mode;
@@ -32,6 +34,7 @@ export class TurnManager {
       turnCount: this.turnCount,
       interviewerTurns: this.interviewerTurns,
       candidateTurns: this.candidateTurns,
+      lastAISpeaker: this.lastAISpeaker,
     };
   }
 
@@ -62,6 +65,9 @@ export class TurnManager {
       this.candidateTurns++;
     }
 
+    // Remember who spoke last
+    this.lastAISpeaker = speaker;
+
     if (this.mode === "step") {
       // In step mode, wait for user to trigger next turn
       this.waitingForNext = true;
@@ -81,13 +87,16 @@ export class TurnManager {
 
     this.waitingForNext = false;
 
-    // Determine next speaker based on current phase
-    if (this.phase === "user_choice" || this.currentSpeaker === "candidate") {
-      this.phase = "interviewer";
-      this.currentSpeaker = "interviewer";
-    } else if (this.currentSpeaker === "interviewer") {
+    // Use lastAISpeaker to determine next speaker
+    // After interviewer -> candidate speaks
+    // After candidate -> interviewer speaks
+    if (this.lastAISpeaker === "interviewer") {
       this.phase = "candidate";
       this.currentSpeaker = "candidate";
+    } else {
+      // After candidate or at start, interviewer speaks
+      this.phase = "interviewer";
+      this.currentSpeaker = "interviewer";
     }
   }
 

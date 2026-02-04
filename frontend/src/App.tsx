@@ -7,7 +7,13 @@ import { VoiceInput } from "./components/VoiceInput";
 import { TextInput } from "./components/TextInput";
 import { TranscriptPanel } from "./components/TranscriptPanel";
 import { CoachPanel, ParticipantsBar } from "./components/CoachPanel";
-import type { Target, InterviewMode } from "./types/ws";
+import { AudioTestPanel } from "./components/AudioTestPanel";
+import { EvaluationPanel } from "./components/EvaluationPanel";
+import type { Target, InterviewMode, InterviewPattern, JapaneseLevel } from "./types/ws";
+import { PatternSelector } from "./components/PatternSelector";
+
+// 開発モードかどうか
+const IS_DEV = import.meta.env.DEV;
 
 function App() {
   const {
@@ -26,8 +32,12 @@ function App() {
     proceedToNext,
     userWillSpeak,
     audioQueue,
-    clearAudioQueue,
+    shiftAudioQueue,
+    audioDone,
+    resetAudioDone,
     notifyAudioPlaybackDone,
+    evaluationResult,
+    clearEvaluationResult,
   } = useWebSocket();
 
   const { playAudio } = useAudioPlayer();
@@ -43,35 +53,48 @@ function App() {
     return () => disconnect();
   }, [connect, disconnect]);
 
-  // Process audio queue
+  // Process audio queue - play one item at a time
   useEffect(() => {
-    const processQueue = async () => {
-      if (audioQueue.length === 0 || isPlayingRef.current) return;
+    if (audioQueue.length === 0 || isPlayingRef.current) return;
 
+    const playNextItem = async () => {
       isPlayingRef.current = true;
+      const item = audioQueue[0];
 
-      while (audioQueue.length > 0) {
-        const item = audioQueue[0];
-        try {
-          await playAudio(item.data);
-        } catch (error) {
-          console.error("Failed to play audio:", error);
-        }
-        clearAudioQueue();
+      try {
+        await playAudio(item.data);
+      } catch (error) {
+        console.error("Failed to play audio:", error);
       }
 
+      // Remove only the first item after playing
+      shiftAudioQueue();
       isPlayingRef.current = false;
-      // Notify server that playback is done
-      notifyAudioPlaybackDone();
     };
 
-    processQueue();
-  }, [audioQueue, playAudio, clearAudioQueue, notifyAudioPlaybackDone]);
+    playNextItem();
+  }, [audioQueue, playAudio, shiftAudioQueue]);
 
-  // Handle start session
+  // Notify server when audio playback is complete
+  useEffect(() => {
+    if (audioDone && audioQueue.length === 0 && !isPlayingRef.current) {
+      notifyAudioPlaybackDone();
+      resetAudioDone();
+    }
+  }, [audioDone, audioQueue.length, notifyAudioPlaybackDone, resetAudioDone]);
+
+  // Handle start session (from PatternSelector)
+  const handlePatternStart = useCallback(
+    (pattern: InterviewPattern, japaneseLevel?: JapaneseLevel) => {
+      startSession(localMode, pattern, japaneseLevel);
+    },
+    [startSession, localMode]
+  );
+
+  // Handle start session (legacy, for SessionControls - uses default pattern)
   const handleStart = useCallback(
     (mode: InterviewMode) => {
-      startSession(mode);
+      startSession(mode, "pattern2", "N4");
     },
     [startSession]
   );
@@ -134,20 +157,6 @@ function App() {
       <header className="header">
         <div className="header-content">
           <h1 className="header-title">面接シミュレーション</h1>
-          <div className="mode-toggle">
-            <button
-              className={`mode-btn ${localMode === "step" ? "active" : ""}`}
-              onClick={() => handleModeChange("step")}
-            >
-              ステップ
-            </button>
-            <button
-              className={`mode-btn ${localMode === "auto" ? "active" : ""}`}
-              onClick={() => handleModeChange("auto")}
-            >
-              オート
-            </button>
-          </div>
         </div>
       </header>
 
@@ -171,7 +180,7 @@ function App() {
             <div className="instructions-list">
               <div className="instruction-item">
                 <span className="instruction-number">1</span>
-                <span>「面接を開始」ボタンを押すと自動で接続し、面接官が最初の質問をします</span>
+                <span>面接パターンと日本語レベルを選択して開始</span>
               </div>
               <div className="instruction-item">
                 <span className="instruction-number">2</span>
@@ -183,6 +192,14 @@ function App() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Pattern Selector (waiting state only) */}
+        {state.phase === "waiting" && !isLoading && (
+          <PatternSelector
+            onStart={handlePatternStart}
+            disabled={!isConnected || isLoading}
+          />
         )}
 
         {/* Participants */}
@@ -209,13 +226,15 @@ function App() {
           )}
 
           {/* Input Controls */}
-          {canInput && state.phase !== "ended" && state.phase !== "user_speaking" && (
+          {canInput && state.phase !== "ended" && (
             <>
-              <TextInput
-                target={selectedTarget}
-                onSend={handleSendText}
-                placeholder="補足を入力..."
-              />
+              {state.phase !== "user_speaking" && (
+                <TextInput
+                  target={selectedTarget}
+                  onSend={handleSendText}
+                  placeholder="補足を入力..."
+                />
+              )}
               <div className="action-buttons visible">
                 <VoiceInput
                   target={selectedTarget}
@@ -225,16 +244,6 @@ function App() {
                 />
               </div>
             </>
-          )}
-
-          {/* Voice recording UI */}
-          {state.phase === "user_speaking" && (
-            <VoiceInput
-              target={selectedTarget}
-              onAudioChunk={handleAudioChunk}
-              onCommit={handleCommitAudio}
-              onStartSpeaking={handleStartSpeaking}
-            />
           )}
 
           {/* Session Controls */}
@@ -250,6 +259,25 @@ function App() {
           />
         </div>
       </div>
+
+      {/* 音声テストパネル（開発モードのみ） */}
+      {IS_DEV && (
+        <AudioTestPanel
+          target={selectedTarget}
+          onAudioChunk={handleAudioChunk}
+          onCommit={handleCommitAudio}
+          onStartSpeaking={handleStartSpeaking}
+          disabled={!canInput || state.phase === "ended"}
+        />
+      )}
+
+      {/* 評価結果パネル */}
+      {evaluationResult && (
+        <EvaluationPanel
+          result={evaluationResult}
+          onClose={clearEvaluationResult}
+        />
+      )}
     </div>
   );
 }

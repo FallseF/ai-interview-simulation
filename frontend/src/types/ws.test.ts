@@ -46,9 +46,12 @@ describe("WebSocket types", () => {
 
   describe("ClientMessage type", () => {
     it("should create valid start_session message", () => {
-      const msg: ClientMessage = { type: "start_session", mode: "step" };
+      const msg: ClientMessage = { type: "start_session", mode: "step", pattern: "pattern1" };
       expect(msg.type).toBe("start_session");
-      expect(msg.mode).toBe("step");
+      if (msg.type === "start_session") {
+        expect(msg.mode).toBe("step");
+        expect(msg.pattern).toBe("pattern1");
+      }
     });
 
     it("should create valid human_text message", () => {
@@ -70,8 +73,16 @@ describe("WebSocket types", () => {
 
   describe("ServerMessage type", () => {
     it("should create valid session_ready message", () => {
-      const msg: ServerMessage = { type: "session_ready" };
+      const msg: ServerMessage = {
+        type: "session_ready",
+        pattern: "pattern1",
+        participants: ["interviewer", "candidate", "human"],
+      };
       expect(msg.type).toBe("session_ready");
+      if (msg.type === "session_ready") {
+        expect(msg.pattern).toBe("pattern1");
+        expect(msg.participants).toContain("interviewer");
+      }
     });
 
     it("should create valid turn_state message", () => {
