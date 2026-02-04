@@ -766,19 +766,29 @@ body::before {
 }
 
 .control-btn.start {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: #fff;
   border-color: var(--accent);
+  padding: 16px 32px;
+  font-size: 1.05rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.35);
+  width: 100%;
+  justify-content: center;
 }
 
 .control-btn.start:hover {
-  background: var(--accent-strong);
+  background: linear-gradient(135deg, var(--accent-strong), #084c42);
+  box-shadow: 0 6px 20px rgba(15, 118, 110, 0.45);
+  transform: translateY(-1px);
 }
 
 .control-btn.start:disabled {
   background: rgba(15, 118, 110, 0.4);
   border-color: rgba(15, 118, 110, 0.4);
+  box-shadow: none;
   cursor: not-allowed;
+  transform: none;
 }
 
 .control-btn.next {
@@ -1110,6 +1120,18 @@ body::before {
 
 .persona-apply-btn:hover {
   background: var(--accent-strong);
+}
+
+.persona-apply-btn.secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid rgba(15, 118, 110, 0.3);
+  font-size: 0.85rem;
+  padding: 10px;
+}
+
+.persona-apply-btn.secondary:hover {
+  background: rgba(15, 118, 110, 0.08);
 }
 
 /* History Modal */

@@ -183,6 +183,11 @@ export function PersonaSelector({
     if (preset) {
       setInterviewer(preset.interviewer);
       setCandidate(preset.candidate);
+      // プリセット選択時は自動的に適用
+      const persona: PersonaConfig = {};
+      if (showInterviewer) persona.interviewer = preset.interviewer;
+      if (showCandidate) persona.candidate = preset.candidate;
+      onSelect(persona);
     }
   };
 
@@ -384,9 +389,12 @@ export function PersonaSelector({
         </div>
       )}
 
-      <button className="persona-apply-btn" onClick={handleApply}>
-        設定を保存
-      </button>
+      {/* カスタムモードの時だけ保存ボタンを表示 */}
+      {mode === "custom" && (
+        <button className="persona-apply-btn secondary" onClick={handleApply}>
+          設定を保存
+        </button>
+      )}
     </div>
   );
 }
