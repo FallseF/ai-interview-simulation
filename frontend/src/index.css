@@ -173,6 +173,13 @@ body::before {
   min-height: calc(100vh - 80px);
 }
 
+.setup-phase {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
 .setup-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
