@@ -155,6 +155,29 @@ export interface EvaluationResult {
   evaluatedAt: string;
 }
 
+// ============================================================
+// History / Database API Types
+// ============================================================
+
+export interface SessionSummary {
+  id: string;
+  pattern: InterviewPattern;
+  japaneseLevel?: JapaneseLevel;
+  mode: InterviewMode;
+  startedAt: string;
+  endedAt?: string;
+  durationSeconds?: number;
+  endReason?: "normal" | "aborted" | null;
+  persona?: PersonaConfig;
+}
+
+export interface TranscriptRecord {
+  sessionId?: string;
+  speaker: Speaker | string;
+  text: string;
+  timestamp: string;
+}
+
 // Transcript entry for display
 export interface TranscriptEntry {
   id: string;

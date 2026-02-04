@@ -355,7 +355,8 @@ export class InterviewOrchestrator {
         this.sessionStore.startSession(
           this.patternConfig.pattern,
           this.turnManager.getMode(),
-          this.patternConfig.japaneseLevel
+          this.patternConfig.japaneseLevel,
+          this.personaConfig
         );
       }
 

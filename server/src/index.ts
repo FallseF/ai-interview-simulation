@@ -6,7 +6,15 @@ import { fileURLToPath } from "url";
 import { validateEnv, PORT, MOCK_MODE } from "./config.js";
 import { InterviewOrchestrator } from "./orchestrator/InterviewOrchestrator.js";
 import type { PatternConfig, InterviewPattern, JapaneseLevel, Role } from "./types/roles.js";
-import { initializeSchema, getRecentSessions, getStatistics, isDbEnabled } from "./db/index.js";
+import {
+  initializeSchema,
+  getRecentSessions,
+  getSessionById,
+  getTranscriptsBySessionId,
+  getEvaluationBySessionId,
+  getStatistics,
+  isDbEnabled,
+} from "./db/index.js";
 import { listScenarios, getScenario, type ScenarioName } from "./testScenarios/index.js";
 import { isAudioDebugEnabled, AudioDebugger } from "./audioTest/AudioDebugger.js";
 import {
@@ -66,6 +74,33 @@ app.get("/api/sessions/recent", async (req, res) => {
   const limit = parseInt((req.query.limit as string) || "10", 10);
   const sessions = await getRecentSessions(limit);
   res.json({ sessions });
+});
+
+// セッション詳細
+app.get("/api/sessions/:id", async (req, res) => {
+  const session = await getSessionById(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+  res.json({ session });
+});
+
+// トランスクリプト取得
+app.get("/api/sessions/:id/transcripts", async (req, res) => {
+  const limit = parseInt((req.query.limit as string) || "200", 10);
+  const transcripts = await getTranscriptsBySessionId(req.params.id, limit);
+  res.json({ transcripts });
+});
+
+// 評価取得
+app.get("/api/sessions/:id/evaluation", async (req, res) => {
+  const evaluation = await getEvaluationBySessionId(req.params.id);
+  if (!evaluation) {
+    res.status(404).json({ error: "Evaluation not found" });
+    return;
+  }
+  res.json({ evaluation });
 });
 
 // 統計情報

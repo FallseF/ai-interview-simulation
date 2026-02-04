@@ -9,6 +9,7 @@ import { TranscriptPanel } from "./components/TranscriptPanel";
 import { CoachPanel, ParticipantsBar } from "./components/CoachPanel";
 import { AudioTestPanel } from "./components/AudioTestPanel";
 import { EvaluationPanel } from "./components/EvaluationPanel";
+import { HistoryModal } from "./components/HistoryModal";
 import { PersonaSelector } from "./components/PersonaSelector";
 import type {
   Target,
@@ -51,6 +52,7 @@ function App() {
   const [selectedTarget, setSelectedTarget] = useState<Target>("both");
   const [localMode, setLocalMode] = useState<InterviewMode>("step");
   const [personaConfig, setPersonaConfig] = useState<PersonaConfig | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const statusLabel = isConnected
     ? state.phase === "waiting"
       ? "待機中"
@@ -185,6 +187,9 @@ function App() {
           <div className="header-status">
             <span className={`status-pill ${statusTone}`}>{statusLabel}</span>
             <span className="mode-pill">モード: {modeLabel}</span>
+            <button className="history-btn" onClick={() => setHistoryOpen(true)}>
+              履歴
+            </button>
           </div>
         </div>
       </header>
@@ -324,6 +329,8 @@ function App() {
           onClose={clearEvaluationResult}
         />
       )}
+
+      <HistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </div>
   );
 }

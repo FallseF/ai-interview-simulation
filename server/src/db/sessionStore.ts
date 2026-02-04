@@ -1,5 +1,11 @@
 import { getDbClient, isDbEnabled } from "./client.js";
-import type { InterviewPattern, JapaneseLevel, InterviewMode, EndReason } from "../types/roles.js";
+import type {
+  InterviewPattern,
+  JapaneseLevel,
+  InterviewMode,
+  EndReason,
+  PersonaConfig,
+} from "../types/roles.js";
 import type { EvaluationResultMessage } from "../types/ws.js";
 import { randomUUID } from "crypto";
 
@@ -12,6 +18,7 @@ export interface SessionData {
   endedAt?: Date;
   durationSeconds?: number;
   endReason?: EndReason;
+  persona?: PersonaConfig;
 }
 
 export interface TranscriptData {
@@ -46,7 +53,8 @@ export class SessionStore {
   async startSession(
     pattern: InterviewPattern,
     mode: InterviewMode,
-    japaneseLevel?: JapaneseLevel
+    japaneseLevel?: JapaneseLevel,
+    persona?: PersonaConfig
   ): Promise<void> {
     this.sessionData = {
       id: this.sessionId,
@@ -54,6 +62,7 @@ export class SessionStore {
       japaneseLevel,
       mode,
       startedAt: new Date(),
+      persona,
     };
 
     if (!isDbEnabled()) return;
@@ -63,14 +72,15 @@ export class SessionStore {
 
     try {
       await client.execute({
-        sql: `INSERT INTO sessions (id, pattern, japanese_level, mode, started_at)
-              VALUES (?, ?, ?, ?, ?)`,
+        sql: `INSERT INTO sessions (id, pattern, japanese_level, mode, started_at, persona_json)
+              VALUES (?, ?, ?, ?, ?, ?)`,
         args: [
           this.sessionId,
           pattern,
           japaneseLevel || null,
           mode,
           this.sessionData.startedAt.toISOString(),
+          persona ? JSON.stringify(persona) : null,
         ],
       });
       console.log(`[DB] Session started: ${this.sessionId}`);
@@ -233,9 +243,69 @@ export async function getRecentSessions(limit = 10): Promise<SessionData[]> {
       endedAt: row.ended_at ? new Date(row.ended_at as string) : undefined,
       durationSeconds: row.duration_seconds as number | undefined,
       endReason: row.end_reason as EndReason,
+      persona: row.persona_json ? JSON.parse(row.persona_json as string) : undefined,
     }));
   } catch (error) {
     console.error("[DB] Failed to get recent sessions:", error);
+    return [];
+  }
+}
+
+/**
+ * セッション詳細を取得
+ */
+export async function getSessionById(sessionId: string): Promise<SessionData | null> {
+  const client = getDbClient();
+  if (!client) return null;
+
+  try {
+    const result = await client.execute({
+      sql: `SELECT * FROM sessions WHERE id = ?`,
+      args: [sessionId],
+    });
+    if (result.rows.length === 0) return null;
+    const row = result.rows[0];
+    return {
+      id: row.id as string,
+      pattern: row.pattern as InterviewPattern,
+      japaneseLevel: row.japanese_level as JapaneseLevel | undefined,
+      mode: row.mode as InterviewMode,
+      startedAt: new Date(row.started_at as string),
+      endedAt: row.ended_at ? new Date(row.ended_at as string) : undefined,
+      durationSeconds: row.duration_seconds as number | undefined,
+      endReason: row.end_reason as EndReason,
+      persona: row.persona_json ? JSON.parse(row.persona_json as string) : undefined,
+    };
+  } catch (error) {
+    console.error("[DB] Failed to get session by id:", error);
+    return null;
+  }
+}
+
+/**
+ * セッションのトランスクリプトを取得
+ */
+export async function getTranscriptsBySessionId(
+  sessionId: string,
+  limit = 200
+): Promise<TranscriptData[]> {
+  const client = getDbClient();
+  if (!client) return [];
+
+  try {
+    const result = await client.execute({
+      sql: `SELECT speaker, text, timestamp FROM transcripts WHERE session_id = ?
+            ORDER BY id ASC LIMIT ?`,
+      args: [sessionId, limit],
+    });
+    return result.rows.map((row) => ({
+      sessionId,
+      speaker: row.speaker as string,
+      text: row.text as string,
+      timestamp: new Date(row.timestamp as string),
+    }));
+  } catch (error) {
+    console.error("[DB] Failed to get transcripts:", error);
     return [];
   }
 }

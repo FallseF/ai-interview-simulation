@@ -18,9 +18,13 @@ export async function initializeSchema(): Promise<void> {
         started_at TEXT NOT NULL,
         ended_at TEXT,
         duration_seconds INTEGER,
-        end_reason TEXT
+        end_reason TEXT,
+        persona_json TEXT
       )
     `);
+
+    // 既存テーブルに persona_json がない場合は追加
+    await ensureColumn(client, "sessions", "persona_json", "TEXT");
 
     // トランスクリプトテーブル
     await client.execute(`
@@ -72,4 +76,20 @@ export async function initializeSchema(): Promise<void> {
     console.error("[DB] Failed to initialize schema:", error);
     throw error;
   }
+}
+
+async function ensureColumn(
+  client: ReturnType<typeof getDbClient>,
+  table: string,
+  column: string,
+  definition: string
+): Promise<void> {
+  if (!client) return;
+
+  const result = await client.execute(`PRAGMA table_info(${table})`);
+  const hasColumn = result.rows.some((row) => row.name === column);
+  if (hasColumn) return;
+
+  await client.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  console.log(`[DB] Added column: ${table}.${column}`);
 }
