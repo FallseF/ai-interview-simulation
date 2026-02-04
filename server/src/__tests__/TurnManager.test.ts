@@ -31,6 +31,14 @@ describe("TurnManager", () => {
       expect(state.currentSpeaker).toBe("interviewer");
       expect(state.turnCount).toBe(1);
     });
+
+    it("should allow starting with candidate", () => {
+      turnManager.start("candidate");
+      const state = turnManager.getState();
+      expect(state.phase).toBe("candidate");
+      expect(state.currentSpeaker).toBe("candidate");
+      expect(state.turnCount).toBe(1);
+    });
   });
 
   describe("step mode", () => {

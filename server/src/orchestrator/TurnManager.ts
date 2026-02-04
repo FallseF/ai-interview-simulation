@@ -49,12 +49,26 @@ export class TurnManager {
   }
 
   // Start the interview
-  start(): void {
-    this.phase = "interviewer";
-    this.currentSpeaker = "interviewer";
+  start(initialSpeaker: Speaker = "interviewer"): void {
+    switch (initialSpeaker) {
+      case "candidate":
+        this.phase = "candidate";
+        break;
+      case "human":
+        this.phase = "user_speaking";
+        break;
+      case "interviewer":
+      default:
+        this.phase = "interviewer";
+        break;
+    }
+
+    this.currentSpeaker = initialSpeaker;
     this.waitingForNext = false;
     this.turnCount = 1;
-    this.interviewerTurns = 1;
+    this.interviewerTurns = initialSpeaker === "interviewer" ? 1 : 0;
+    this.candidateTurns = initialSpeaker === "candidate" ? 1 : 0;
+    this.lastAISpeaker = null;
   }
 
   // Called when AI finishes speaking
@@ -186,5 +200,6 @@ export class TurnManager {
     this.turnCount = 0;
     this.interviewerTurns = 0;
     this.candidateTurns = 0;
+    this.lastAISpeaker = null;
   }
 }

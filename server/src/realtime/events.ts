@@ -117,7 +117,6 @@ export function normalizeEvent(event: RealtimeEvent): NormalizedEvent {
 
     case "input_transcript_done": {
       const e = event as InputAudioTranscriptionCompletedEvent;
-      console.log("[Events] Input transcript raw event:", JSON.stringify(e, null, 2));
       normalized.data = { fullText: e.transcript };
       break;
     }

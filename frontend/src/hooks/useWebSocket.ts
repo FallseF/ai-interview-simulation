@@ -236,17 +236,6 @@ export function useWebSocket(): UseWebSocketReturn {
   const sendText = useCallback(
     (target: Target, text: string) => {
       send({ type: "human_text", target, text });
-      // Add to transcripts locally
-      setTranscripts((prev) => [
-        ...prev,
-        {
-          id: generateId(),
-          speaker: "human",
-          name: "転職支援",
-          text,
-          timestamp: new Date(),
-        },
-      ]);
     },
     [send]
   );

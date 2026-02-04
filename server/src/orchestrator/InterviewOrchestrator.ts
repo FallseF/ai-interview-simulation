@@ -32,6 +32,7 @@ export class InterviewOrchestrator {
   private endReason: EndReason = null;
 
   private currentTranscriptBuffer = "";
+  private interviewStartTime: Date | null = null;
 
   // パターン設定
   private patternConfig: PatternConfig;
@@ -291,7 +292,12 @@ export class InterviewOrchestrator {
       });
       this.sendToClient({ type: "sessions_ready" }); // Legacy
 
-      this.turnManager.start();
+      if (!this.interviewStartTime) {
+        this.interviewStartTime = new Date();
+      }
+
+      const initialSpeaker = this.patternConfig.pattern === "pattern1" ? "candidate" : "interviewer";
+      this.turnManager.start(initialSpeaker);
       this.sendTurnState();
 
       // パターンに応じた開始処理
@@ -646,7 +652,7 @@ export class InterviewOrchestrator {
     console.log("[Orchestrator] Starting evaluation...");
 
     try {
-      const evaluator = new Evaluator();
+      const evaluator = new Evaluator(undefined, this.interviewStartTime || undefined);
       const transcripts = this.transcriptStore.getAll();
       const result = evaluator.evaluate(transcripts);
 

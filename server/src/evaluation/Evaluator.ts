@@ -20,9 +20,9 @@ export class Evaluator {
   private sessionId: string;
   private startTime: Date;
 
-  constructor(sessionId?: string) {
+  constructor(sessionId?: string, startTime?: Date) {
     this.sessionId = sessionId || Date.now().toString();
-    this.startTime = new Date();
+    this.startTime = startTime || new Date();
   }
 
   /**

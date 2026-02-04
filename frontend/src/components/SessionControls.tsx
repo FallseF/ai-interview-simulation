@@ -51,7 +51,7 @@ export function SessionControls({
             <button
               className="control-btn start"
               onClick={() => onStart(mode)}
-              disabled={!isConnected && isLoading}
+              disabled={!isConnected || isLoading}
             >
               面接を開始
             </button>

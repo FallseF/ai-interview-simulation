@@ -143,7 +143,7 @@ app.post("/api/debug/audio/analyze", express.json({ limit: "10mb" }), (req, res)
 });
 
 // Serve index.html for SPA routes
-app.get("/{*splat}", (req, res) => {
+app.use((req, res) => {
   // Try frontend build first
   const frontendIndex = path.join(publicPath, "index.html");
   const fallbackIndex = path.join(fallbackPath, "index.html");
