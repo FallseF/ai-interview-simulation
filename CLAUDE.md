@@ -22,11 +22,20 @@ Claude の学習データは 2025年1月 までのため、それ以降に変更
 - モデル名: `gpt-realtime` (2024年12月時点)
 - WebSocket URL: `wss://api.openai.com/v1/realtime?model=gpt-realtime`
 
+## Git 運用ルール
+
+- **mainブランチへの直接編集は禁止** - 必ずfeatureブランチを切ってからPR経由でマージ
+- ブランチ命名規則: `feature/機能名`, `fix/バグ内容`, `refactor/対象`
+
 ## 開発コマンド
 ```bash
-npm run build    # TypeScriptビルド
-npm start        # サーバー起動
-npm run dev      # 開発モード
+npm run build         # TypeScriptビルド
+npm run build:server  # サーバーのみビルド
+npm run build:frontend # フロントエンドのみビルド
+npm start             # サーバー起動
+npm run dev           # サーバー開発モード
+npm run dev:frontend  # フロントエンド開発モード
+npm test              # 全テスト実行
 ```
 
 ## トラブルシューティング

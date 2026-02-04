@@ -195,3 +195,13 @@ export interface InterviewState {
   mode: InterviewMode;
   endReason?: "normal" | "aborted";
 }
+
+// UI Phase for page transitions
+export type UIPhase = "setup" | "interview" | "result";
+
+// Helper function to map WebSocket phase to UI phase
+export function getUIPhase(wsPhase: InterviewState["phase"]): UIPhase {
+  if (wsPhase === "waiting") return "setup";
+  if (wsPhase === "ended") return "result";
+  return "interview";
+}
