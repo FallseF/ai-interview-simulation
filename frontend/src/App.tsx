@@ -1,16 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useAudioPlayer } from "./hooks/useAudioRecorder";
-import { SessionControls } from "./components/SessionControls";
-import { TargetSelector } from "./components/TargetSelector";
-import { VoiceInput } from "./components/VoiceInput";
-import { TextInput } from "./components/TextInput";
-import { TranscriptPanel } from "./components/TranscriptPanel";
-import { CoachPanel, ParticipantsBar } from "./components/CoachPanel";
 import { AudioTestPanel } from "./components/AudioTestPanel";
-import { EvaluationPanel } from "./components/EvaluationPanel";
 import { HistoryModal } from "./components/HistoryModal";
-import { PersonaSelector } from "./components/PersonaSelector";
+import { StepIndicator } from "./components/StepIndicator";
+import { SetupPhase } from "./components/phases/SetupPhase";
+import { InterviewPhase } from "./components/phases/InterviewPhase";
+import { ResultPhase } from "./components/phases/ResultPhase";
 import type {
   Target,
   InterviewMode,
@@ -18,9 +14,9 @@ import type {
   JapaneseLevel,
   PersonaConfig,
 } from "./types/ws";
-import { PatternSelector } from "./components/PatternSelector";
+import { getUIPhase } from "./types/ws";
 
-// 開発モードかどうか
+// Development mode check
 const IS_DEV = import.meta.env.DEV;
 
 function App() {
@@ -45,14 +41,17 @@ function App() {
     resetAudioDone,
     notifyAudioPlaybackDone,
     evaluationResult,
-    clearEvaluationResult,
   } = useWebSocket();
 
   const { playAudio } = useAudioPlayer();
-  const [selectedTarget, setSelectedTarget] = useState<Target>("both");
+  const fixedTarget: Target = "interviewer";
   const [localMode, setLocalMode] = useState<InterviewMode>("step");
   const [personaConfig, setPersonaConfig] = useState<PersonaConfig | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Get current UI phase
+  const uiPhase = getUIPhase(state.phase);
+
   const statusLabel = isConnected
     ? state.phase === "waiting"
       ? "待機中"
@@ -194,139 +193,60 @@ function App() {
         </div>
       </header>
 
+      {/* Step Indicator */}
+      <StepIndicator currentPhase={uiPhase} />
+
       <div className="main-container">
-        {/* Setup (waiting state only) */}
-        {state.phase === "waiting" && (
-          <div className="setup-grid">
-            <div className="setup-card">
-              <div className="instructions-card">
-                <div className="instructions-header">
-                  <div className="instructions-icon-wrapper">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" x2="12" y1="16" y2="12" />
-                      <line x1="12" x2="12.01" y1="8" y2="8" />
-                    </svg>
-                  </div>
-                  <span className="instructions-title">使い方</span>
-                </div>
-                <p className="instructions-text">
-                  あなたは<strong>転職支援エージェント</strong>として、外国人求職者の面接をサポートします。
-                </p>
-                <div className="instructions-list">
-                  <div className="instruction-item">
-                    <span className="instruction-number">1</span>
-                    <span>面接パターンと日本語レベルを選択して開始</span>
-                  </div>
-                  <div className="instruction-item">
-                    <span className="instruction-number">2</span>
-                    <span>求職者の回答後、テキストまたは音声で補足できます</span>
-                  </div>
-                  <div className="instruction-item">
-                    <span className="instruction-number">3</span>
-                    <span>補足の送り先（面接官のみ/求職者のみ/両方）を選択できます</span>
-                  </div>
-                </div>
-              </div>
-
-              {!isLoading && (
-                <PatternSelector
-                  onStart={handlePatternStart}
-                  disabled={!isConnected || isLoading}
-                />
-              )}
-            </div>
-
-            <div className="setup-card">
-              <PersonaSelector onSelect={handlePersonaSelect} />
-            </div>
-          </div>
+        {/* Setup Phase */}
+        {uiPhase === "setup" && (
+          <SetupPhase
+            isConnected={isConnected}
+            isLoading={isLoading}
+            onPatternStart={handlePatternStart}
+            onPersonaSelect={handlePersonaSelect}
+          />
         )}
 
-        {/* Participants */}
-        <ParticipantsBar currentSpeaker={state.currentSpeaker} />
+        {/* Interview Phase */}
+        {uiPhase === "interview" && (
+          <InterviewPhase
+            state={state}
+            transcripts={transcripts}
+            isConnected={isConnected}
+            isLoading={isLoading}
+            localMode={localMode}
+            fixedTarget={fixedTarget}
+            canInput={canInput}
+            onSendText={handleSendText}
+            onAudioChunk={handleAudioChunk}
+            onCommitAudio={handleCommitAudio}
+            onStartSpeaking={handleStartSpeaking}
+            onStart={handleStart}
+            onModeChange={handleModeChange}
+            onNextTurn={nextTurn}
+            onProceedToNext={proceedToNext}
+            onRestart={handleRestart}
+          />
+        )}
 
-        {/* Workspace */}
-        <div className="workspace">
-          <section className="chat-panel">
-            <div className="panel-header">
-              <div className="panel-title">会話ログ</div>
-              <div className="panel-meta">{transcripts.length} entries</div>
-            </div>
-            <TranscriptPanel
-              transcripts={transcripts}
-              currentSpeaker={state.currentSpeaker}
-            />
-          </section>
-
-          <aside className="control-panel">
-            <div className="panel-header">
-              <div className="panel-title">操作パネル</div>
-              <div className="panel-meta">進行と補足</div>
-            </div>
-
-            <div className="panel-body">
-              <CoachPanel state={state} />
-
-              {canInput && state.phase !== "ended" && (
-                <TargetSelector
-                  selectedTarget={selectedTarget}
-                  onTargetChange={setSelectedTarget}
-                  disabled={state.phase === "user_speaking"}
-                />
-              )}
-
-              {canInput && state.phase !== "ended" && (
-                <>
-                  {state.phase !== "user_speaking" && (
-                    <TextInput
-                      target={selectedTarget}
-                      onSend={handleSendText}
-                      placeholder="補足を入力..."
-                    />
-                  )}
-                  <div className="action-buttons visible">
-                    <VoiceInput
-                      target={selectedTarget}
-                      onAudioChunk={handleAudioChunk}
-                      onCommit={handleCommitAudio}
-                      onStartSpeaking={handleStartSpeaking}
-                    />
-                  </div>
-                </>
-              )}
-
-              <SessionControls
-                state={{ ...state, mode: localMode }}
-                isConnected={isConnected}
-                isLoading={isLoading}
-                onStart={handleStart}
-                onModeChange={handleModeChange}
-                onNextTurn={nextTurn}
-                onProceedToNext={proceedToNext}
-                onRestart={handleRestart}
-              />
-            </div>
-          </aside>
-        </div>
+        {/* Result Phase */}
+        {uiPhase === "result" && (
+          <ResultPhase
+            evaluationResult={evaluationResult}
+            endReason={state.endReason}
+            onRestart={handleRestart}
+          />
+        )}
       </div>
 
-      {/* 音声テストパネル（開発モードのみ） */}
+      {/* Audio Test Panel (Dev mode only) */}
       {IS_DEV && (
         <AudioTestPanel
-          target={selectedTarget}
+          target={fixedTarget}
           onAudioChunk={handleAudioChunk}
           onCommit={handleCommitAudio}
           onStartSpeaking={handleStartSpeaking}
           disabled={!canInput || state.phase === "ended"}
-        />
-      )}
-
-      {/* 評価結果パネル */}
-      {evaluationResult && (
-        <EvaluationPanel
-          result={evaluationResult}
-          onClose={clearEvaluationResult}
         />
       )}
 

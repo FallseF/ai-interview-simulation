@@ -62,7 +62,7 @@ describe("App persona integration", () => {
     if (!patternSection) {
       throw new Error("Pattern selector not found");
     }
-    const startButton = within(patternSection).getByRole("button", { name: "面接を開始" });
+    const startButton = within(patternSection as HTMLElement).getByRole("button", { name: "面接を開始" });
     fireEvent.click(startButton);
 
     expect(startSessionMock).toHaveBeenCalledTimes(1);
