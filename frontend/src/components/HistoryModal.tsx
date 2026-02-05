@@ -8,6 +8,9 @@ import type {
   InterviewMode,
 } from "../types/ws";
 
+// API base URL - use environment variable or relative path
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
 interface HistoryModalProps {
   open: boolean;
   onClose: () => void;
@@ -83,11 +86,11 @@ export function HistoryModal({ open, onClose }: HistoryModalProps) {
     const load = async () => {
       setLoading(true);
       try {
-        const statusRes = await fetch("/api/db/status", { signal: controller.signal });
+        const statusRes = await fetch(`${API_BASE}/api/db/status`, { signal: controller.signal });
         const statusJson = await statusRes.json();
         setDbEnabled(Boolean(statusJson.enabled));
 
-        const res = await fetch("/api/sessions/recent?limit=50", { signal: controller.signal });
+        const res = await fetch(`${API_BASE}/api/sessions/recent?limit=50`, { signal: controller.signal });
         const json = await res.json();
         const list = (json.sessions || []) as SessionSummary[];
         setSessions(list);
@@ -115,15 +118,15 @@ export function HistoryModal({ open, onClose }: HistoryModalProps) {
       setDetailLoading(true);
       try {
         const [sessionRes, transcriptRes] = await Promise.all([
-          fetch(`/api/sessions/${selectedId}`, { signal: controller.signal }),
-          fetch(`/api/sessions/${selectedId}/transcripts`, { signal: controller.signal }),
+          fetch(`${API_BASE}/api/sessions/${selectedId}`, { signal: controller.signal }),
+          fetch(`${API_BASE}/api/sessions/${selectedId}/transcripts`, { signal: controller.signal }),
         ]);
         const sessionJson = await sessionRes.json();
         const transcriptJson = await transcriptRes.json();
         setDetail(sessionJson.session || null);
         setTranscripts(transcriptJson.transcripts || []);
 
-        const evalRes = await fetch(`/api/sessions/${selectedId}/evaluation`, {
+        const evalRes = await fetch(`${API_BASE}/api/sessions/${selectedId}/evaluation`, {
           signal: controller.signal,
         });
         if (evalRes.ok) {
